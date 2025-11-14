@@ -9,9 +9,10 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 
-from app.core.exceptions import http_409, http_404
+from app.core.exceptions import http_409, http_404, http_403
 from app.db.repositories.auth.auth import AuthRepository
 from app.db.tables.documents.documents_metadata import DocumentMetadata, doc_user_access
+from app.db.tables.auth.auth import User
 from app.db.tables.base_class import StatusEnum
 from app.schemas.auth.bands import TokenData
 from app.schemas.documents.bands import DocumentMetadataPatch
@@ -342,3 +343,96 @@ class DocumentMetadataRepository:
         if doc and doc.status != StatusEnum.archived:
             raise http_409(msg="Doc is not archived")
         raise http_404(msg="Doc does not exits")
+
+    async def get_users_with_access(
+        self, document: Union[str, UUID], owner: TokenData
+    ) -> List[Dict[str, str]]:
+        """
+        Get list of users who have access to a document.
+        Returns list of users with their id, email, and username.
+        """
+        db_document = await self._get_instance(document=document, owner=owner)
+        
+        # Get users from doc_user_access table
+        stmt = (
+            select(User)
+            .join(doc_user_access, User.id == doc_user_access.c.user_id)
+            .where(doc_user_access.c.doc_id == db_document.id)
+        )
+        result = await self.session.execute(stmt)
+        users = result.scalars().all()
+        
+        # Also include users from access_to field (emails/user_ids)
+        access_list = []
+        if db_document.access_to:
+            for access_item in db_document.access_to:
+                # Try to find user by email or id
+                try:
+                    user = await self.session.execute(
+                        select(User).where(
+                            (User.email == access_item) | (User.id == access_item)
+                        )
+                    )
+                    user_obj = user.scalar_one_or_none()
+                    if user_obj:
+                        access_list.append({
+                            "id": user_obj.id,
+                            "email": user_obj.email,
+                            "username": user_obj.username,
+                        })
+                except Exception:
+                    # If user not found, still include the access item
+                    access_list.append({
+                        "id": access_item,
+                        "email": access_item if "@" in access_item else None,
+                        "username": access_item if "@" not in access_item else None,
+                    })
+        
+        # Combine and deduplicate
+        user_dict = {}
+        for user in users:
+            user_dict[user.id] = {
+                "id": user.id,
+                "email": user.email,
+                "username": user.username,
+            }
+        for item in access_list:
+            if item["id"] not in user_dict:
+                user_dict[item["id"]] = item
+        
+        return list(user_dict.values())
+
+    async def remove_user_access(
+        self, document: Union[str, UUID], user_email_or_id: str, owner: TokenData
+    ) -> None:
+        """
+        Remove a specific user's access to a document.
+        """
+        db_document = await self._get_instance(document=document, owner=owner)
+        
+        # Find user by email or id
+        user_stmt = select(User).where(
+            (User.email == user_email_or_id) | (User.id == user_email_or_id)
+        )
+        user_result = await self.session.execute(user_stmt)
+        user_obj = user_result.scalar_one_or_none()
+        
+        if not user_obj:
+            raise http_404(msg=f"User '{user_email_or_id}' not found")
+        
+        # Remove from doc_user_access table
+        stmt = delete(doc_user_access).where(
+            (doc_user_access.c.doc_id == db_document.id) &
+            (doc_user_access.c.user_id == user_obj.id)
+        )
+        await self.session.execute(stmt)
+        
+        # Remove from access_to array
+        if db_document.access_to:
+            updated_access_to = [
+                item for item in db_document.access_to
+                if item != user_obj.email and item != user_obj.id
+            ]
+            setattr(db_document, "access_to", updated_access_to if updated_access_to else None)
+        
+        await self.session.commit()

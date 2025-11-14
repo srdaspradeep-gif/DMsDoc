@@ -275,3 +275,62 @@ async def un_archive(
     """
 
     return await repository.un_archive(file=file, user=user)
+
+
+# Access Control
+
+@router.get(
+    "/{document}/access",
+    response_model=List[Dict[str, str]],
+    status_code=status.HTTP_200_OK,
+    name="get_document_access",
+)
+async def get_document_access(
+    document: Union[str, UUID],
+    repository: DocumentMetadataRepository = Depends(
+        get_repository(DocumentMetadataRepository)
+    ),
+    user: TokenData = Depends(get_current_user),
+) -> List[Dict[str, str]]:
+    """
+    Get list of users who have access to a document.
+
+    Args:
+        document (Union[str, UUID]): The ID or name of the document.
+        repository (DocumentMetadataRepository): The repository for document metadata.
+        user (TokenData): The user token data.
+
+    Returns:
+        List[Dict[str, str]]: List of users with access (id, email, username).
+    """
+    return await repository.get_users_with_access(document=document, owner=user)
+
+
+@router.delete(
+    "/{document}/access/{user_email_or_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    name="remove_document_access",
+)
+async def remove_document_access(
+    document: Union[str, UUID],
+    user_email_or_id: str,
+    repository: DocumentMetadataRepository = Depends(
+        get_repository(DocumentMetadataRepository)
+    ),
+    user: TokenData = Depends(get_current_user),
+) -> None:
+    """
+    Remove a user's access to a document.
+
+    Args:
+        document (Union[str, UUID]): The ID or name of the document.
+        user_email_or_id (str): The email or ID of the user to remove access from.
+        repository (DocumentMetadataRepository): The repository for document metadata.
+        user (TokenData): The user token data.
+
+    Returns:
+        None (204_NO_CONTENT)
+    """
+    await repository.remove_user_access(
+        document=document, user_email_or_id=user_email_or_id, owner=user
+    )

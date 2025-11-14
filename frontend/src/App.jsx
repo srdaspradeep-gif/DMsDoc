@@ -6,6 +6,7 @@ import Register from './pages/Register'
 import Dashboard from './pages/Dashboard'
 import Documents from './pages/Documents'
 import DocumentDetail from './pages/DocumentDetail'
+import DocumentPreview from './pages/DocumentPreview'
 import Trash from './pages/Trash'
 import Tags from './pages/Tags'
 import Correspondents from './pages/Correspondents'
@@ -62,6 +63,15 @@ function App() {
             <Route path="tasks" element={<div className="p-6"><h1 className="text-2xl font-semibold">File Tasks</h1><p className="text-gray-600 mt-2">Coming soon...</p></div>} />
             <Route path="logs" element={<div className="p-6"><h1 className="text-2xl font-semibold">Logs</h1><p className="text-gray-600 mt-2">Coming soon...</p></div>} />
           </Route>
+          {/* Preview route outside Layout for fullscreen */}
+          <Route
+            path="/preview/:id"
+            element={
+              <PrivateRoute>
+                <DocumentPreview />
+              </PrivateRoute>
+            }
+          />
         </Routes>
       </Router>
     </AuthProvider>
