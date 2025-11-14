@@ -23,9 +23,20 @@ export default function UploadModal({ onClose, onSuccess, defaultFolder = null }
 
   useEffect(() => {
     loadCategoriesAndFolders()
-    // Set default folder if provided
+  }, [])
+
+  useEffect(() => {
+    // Set default folder if provided (separate effect to handle updates)
     if (defaultFolder) {
+      console.log('Setting default folder in UploadModal:', defaultFolder)
       setFolder(defaultFolder)
+      // Also add to folders list if it doesn't exist
+      setFolders(prev => {
+        if (!prev.includes(defaultFolder)) {
+          return [...prev, defaultFolder].sort()
+        }
+        return prev
+      })
     }
   }, [defaultFolder])
 

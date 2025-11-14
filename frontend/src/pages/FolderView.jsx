@@ -500,7 +500,7 @@ export default function FolderView() {
               loadFoldersAndDocuments()
             }, 1500)
           }}
-          defaultFolder={selectedFolder || undefined}
+          defaultFolder={selectedFolder || newFolderName || undefined}
         />
       )}
     </div>
