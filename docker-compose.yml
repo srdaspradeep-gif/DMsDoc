@@ -33,7 +33,7 @@ services:
       - "9000:9000"
       - "9001:9001"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:9000/minio/health/live"]
       interval: 30s
       timeout: 20s
       retries: 3
@@ -58,6 +58,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-NewStrongPassword_2025!}
       POSTGRES_DB: ${POSTGRES_DB:-docflow}
+      HOST_URL: ${HOST_URL:-http://localhost:8000}
     ports:
       - "${API_PORT:-8000}:8000"
     volumes:
@@ -65,7 +66,7 @@ services:
       - ./logs:/app/logs
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -85,7 +86,10 @@ services:
       - ./frontend:/app
       - /app/node_modules
     environment:
-      - VITE_API_URL=http://localhost:8000
+      - VITE_API_URL=${VITE_API_URL:-/api}
+      - VITE_API_PROXY_TARGET=${VITE_API_PROXY_TARGET:-http://api:8000}
+      - VITE_SERVER_HOST=${VITE_SERVER_HOST:-0.0.0.0}
+      - VITE_SERVER_PORT=${VITE_SERVER_PORT:-3000}
     command: npm run dev -- --host 0.0.0.0
     networks:
       - docflow-network

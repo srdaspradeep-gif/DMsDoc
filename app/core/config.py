@@ -11,10 +11,10 @@ class GlobalConfig(BaseSettings):
     Global Configuration for the FastAPI application.
     """
 
-    title: str = os.environ.get("TITLE")
+    title: str = os.environ.get("TITLE", "DocFlow API")
     version: str = "1.0.0"
-    description: str = os.environ.get("DESCRIPTION")
-    host_url: str = "http://localhost:8000"
+    description: str = os.environ.get("DESCRIPTION", "Document Management System API")
+    host_url: str = os.environ.get("HOST_URL", "http://localhost:8000")
     docs_url: str = "/docs"
     redoc_url: str = "/redoc"
     openapi_url: str = "/openapi.json"
