@@ -19,20 +19,93 @@ import toast from 'react-hot-toast'
 import { format } from 'date-fns'
 import UploadModal from '../components/UploadModal'
 
+// Tree node structure for nested folders
+class FolderNode {
+  constructor(name, path = '') {
+    this.name = name
+    this.path = path || name
+    this.children = new Map()
+    this.documents = []
+    this.expanded = false
+  }
+
+  addChild(name, path) {
+    if (!this.children.has(name)) {
+      this.children.set(name, new FolderNode(name, path))
+    }
+    return this.children.get(name)
+  }
+
+  getDocumentCount() {
+    return this.documents.length + Array.from(this.children.values())
+      .reduce((sum, child) => sum + child.getDocumentCount(), 0)
+  }
+}
+
 export default function FolderView() {
-  const [folders, setFolders] = useState([])
+  const [folderTree, setFolderTree] = useState(new FolderNode('root', ''))
   const [documents, setDocuments] = useState([])
-  const [expandedFolders, setExpandedFolders] = useState(new Set())
-  const [selectedFolder, setSelectedFolder] = useState(null)
+  const [expandedPaths, setExpandedPaths] = useState(new Set())
+  const [selectedPath, setSelectedPath] = useState(null)
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [showCreateFolder, setShowCreateFolder] = useState(false)
   const [newFolderName, setNewFolderName] = useState('')
+  const [parentPath, setParentPath] = useState(null) // For creating sub-folders
   const [showUpload, setShowUpload] = useState(false)
 
   useEffect(() => {
     loadFoldersAndDocuments()
   }, [])
+
+  const buildFolderTree = (docs) => {
+    const root = new FolderNode('root', '')
+    const rootDocs = []
+
+    docs.forEach(doc => {
+      if (doc.s3_url) {
+        try {
+          const url = new URL(doc.s3_url)
+          const pathParts = url.pathname.split('/').filter(p => p)
+          
+          // Path structure: [bucket, user_id, folder_path, filename]
+          // Example: /docflow/user_id/Parent/SubFolder/filename.pdf
+          // pathParts = ['docflow', 'user_id', 'Parent', 'SubFolder', 'filename.pdf']
+          
+          if (pathParts.length >= 4) {
+            // Everything after user_id and before filename is the folder path
+            const folderPathParts = pathParts.slice(2, -1) // Skip bucket, user_id, and filename
+            
+            if (folderPathParts.length > 0) {
+              // Build nested folder structure
+              let current = root
+              let currentPath = ''
+              
+              folderPathParts.forEach((folderName, index) => {
+                currentPath = currentPath ? `${currentPath}/${folderName}` : folderName
+                current = current.addChild(folderName, currentPath)
+              })
+              
+              // Add document to the deepest folder
+              current.documents.push(doc)
+            } else {
+              rootDocs.push(doc)
+            }
+          } else {
+            // Document in root (no folder)
+            rootDocs.push(doc)
+          }
+        } catch (e) {
+          console.error('Error parsing URL:', e, doc.s3_url)
+          rootDocs.push(doc)
+        }
+      } else {
+        rootDocs.push(doc)
+      }
+    })
+
+    return { root, rootDocs }
+  }
 
   const loadFoldersAndDocuments = async () => {
     try {
@@ -42,83 +115,14 @@ export default function FolderView() {
       const docsKey = Object.keys(data).find(key => key.startsWith('documents of '))
       const docs = docsKey ? (data[docsKey] || []) : []
       
-      // Organize documents by folder
-      const folderMap = new Map()
-      const rootDocuments = []
+      const { root, rootDocs } = buildFolderTree(docs)
       
-      docs.forEach(doc => {
-        if (doc.s3_url) {
-          try {
-            const url = new URL(doc.s3_url)
-            const pathParts = url.pathname.split('/').filter(p => p)
-            
-            console.log('Folder extraction - s3_url:', doc.s3_url)
-            console.log('Folder extraction - pathParts:', pathParts)
-            
-            // Path structure: [bucket, user_id, folder, filename]
-            // Example: /docflow/01KA16R373RZ872JKFE0G00DMC/MPPCB/filename.pdf
-            // pathParts = ['docflow', '01KA16R373RZ872JKFE0G00DMC', 'MPPCB', 'filename.pdf']
-            if (pathParts.length >= 4) {
-              const folderName = pathParts[2] // Index 2 is the folder
-              console.log('Extracted folder name:', folderName)
-              if (!folderMap.has(folderName)) {
-                folderMap.set(folderName, {
-                  name: folderName,
-                  documents: [],
-                  path: folderName
-                })
-              }
-              folderMap.get(folderName).documents.push(doc)
-            } else {
-              // Document in root (no folder)
-              console.log('Document in root - pathParts length:', pathParts.length)
-              rootDocuments.push(doc)
-            }
-          } catch (e) {
-            console.error('Error parsing URL:', e, doc.s3_url)
-            // Fallback parsing
-            const parts = doc.s3_url.split('/').filter(p => p && !p.includes(':'))
-            console.log('Fallback parsing - parts:', parts)
-            if (parts.length >= 4) {
-              const folderName = parts[2]
-              if (!folderMap.has(folderName)) {
-                folderMap.set(folderName, {
-                  name: folderName,
-                  documents: [],
-                  path: folderName
-                })
-              }
-              folderMap.get(folderName).documents.push(doc)
-            } else {
-              rootDocuments.push(doc)
-            }
-          }
-        } else {
-          rootDocuments.push(doc)
-        }
-      })
+      setFolderTree(root)
+      setDocuments(rootDocs)
       
-      console.log('Folder map:', Array.from(folderMap.keys()))
-      console.log('Root documents count:', rootDocuments.length)
-      
-      // Convert to array and sort
-      const foldersList = Array.from(folderMap.values())
-        .map(folder => ({
-          ...folder,
-          documentCount: folder.documents.length
-        }))
-        .sort((a, b) => a.name.localeCompare(b.name))
-      
-      console.log('Final folders list:', foldersList)
-      console.log('Final root documents:', rootDocuments.length)
-      
-      setFolders(foldersList)
-      setDocuments(rootDocuments)
-      
-      // Auto-expand first folder if available
-      if (foldersList.length > 0 && expandedFolders.size === 0) {
-        setExpandedFolders(new Set([foldersList[0].name]))
-        setSelectedFolder(foldersList[0].name)
+      // Auto-expand root if it has children
+      if (root.children.size > 0) {
+        setExpandedPaths(new Set(['root']))
       }
     } catch (error) {
       console.error('Failed to load folders:', error)
@@ -128,41 +132,66 @@ export default function FolderView() {
     }
   }
 
-  const toggleFolder = (folderName) => {
-    const newExpanded = new Set(expandedFolders)
-    if (newExpanded.has(folderName)) {
-      newExpanded.delete(folderName)
-      if (selectedFolder === folderName) {
-        setSelectedFolder(null)
-      }
+  const toggleFolder = (path) => {
+    const newExpanded = new Set(expandedPaths)
+    if (newExpanded.has(path)) {
+      newExpanded.delete(path)
     } else {
-      newExpanded.add(folderName)
-      setSelectedFolder(folderName)
+      newExpanded.add(path)
     }
-    setExpandedFolders(newExpanded)
+    setExpandedPaths(newExpanded)
   }
 
-  const handleCreateFolder = async () => {
+  const selectFolder = (path) => {
+    setSelectedPath(path)
+  }
+
+  const getFolderByPath = (node, pathParts, index = 0) => {
+    if (index >= pathParts.length) return node
+    const child = node.children.get(pathParts[index])
+    if (!child) return null
+    return getFolderByPath(child, pathParts, index + 1)
+  }
+
+  const getDocumentsForPath = (path) => {
+    if (!path || path === 'root') {
+      return documents
+    }
+    
+    const pathParts = path.split('/')
+    const folder = getFolderByPath(folderTree, pathParts)
+    return folder ? folder.documents : []
+  }
+
+  const handleCreateFolder = () => {
     if (!newFolderName.trim()) {
       toast.error('Please enter a folder name')
       return
     }
     
     const trimmedName = newFolderName.trim()
+    const fullPath = parentPath ? `${parentPath}/${trimmedName}` : trimmedName
     
     // Check if folder already exists
-    if (folders.some(f => f.name.toLowerCase() === trimmedName.toLowerCase())) {
+    const pathParts = fullPath.split('/')
+    const existingFolder = getFolderByPath(folderTree, pathParts)
+    if (existingFolder) {
       toast.error('Folder already exists')
       return
     }
     
     // Folders are created when documents are uploaded to them
-    // So we'll open the upload modal with this folder pre-selected
-    setSelectedFolder(trimmedName)
+    setSelectedPath(fullPath)
     setShowCreateFolder(false)
     setNewFolderName('')
+    setParentPath(null)
     setShowUpload(true)
-    toast(`Upload a document to create the folder "${trimmedName}"`, { icon: 'ℹ️' })
+    toast(`Upload a document to create the folder "${fullPath}"`, { icon: 'ℹ️' })
+  }
+
+  const handleCreateSubFolder = (parentPath) => {
+    setParentPath(parentPath)
+    setShowCreateFolder(true)
   }
 
   const handleDeleteDocument = async (docName) => {
@@ -195,21 +224,109 @@ export default function FolderView() {
     }
   }
 
-  const getCurrentDocuments = () => {
-    if (selectedFolder) {
-      const folder = folders.find(f => f.name === selectedFolder)
-      return folder ? folder.documents : []
+  const renderFolderTree = (node, level = 0, parentPath = '') => {
+    if (node.name === 'root' && node.children.size === 0) {
+      return null
     }
-    return documents
+
+    const folders = []
+    
+    // Render children folders
+    Array.from(node.children.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .forEach(([name, childNode]) => {
+        const currentPath = parentPath ? `${parentPath}/${name}` : name
+        const isExpanded = expandedPaths.has(currentPath)
+        const isSelected = selectedPath === currentPath
+        const hasChildren = childNode.children.size > 0
+        const docCount = childNode.getDocumentCount()
+
+        folders.push(
+          <div key={currentPath} className="select-none">
+            <div
+              className={`flex items-center space-x-2 p-2 rounded-lg cursor-pointer ${
+                isSelected
+                  ? 'bg-blue-100 text-blue-700'
+                  : 'hover:bg-gray-100 text-gray-700'
+              }`}
+              style={{ paddingLeft: `${(level * 16) + 8}px` }}
+            >
+              {hasChildren ? (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    toggleFolder(currentPath)
+                  }}
+                  className="p-0.5 hover:bg-gray-200 rounded"
+                >
+                  {isExpanded ? (
+                    <ChevronDown size={14} className="text-gray-500" />
+                  ) : (
+                    <ChevronRight size={14} className="text-gray-500" />
+                  )}
+                </button>
+              ) : (
+                <div className="w-4" /> // Spacer for alignment
+              )}
+              
+              {isExpanded ? (
+                <FolderOpen size={16} className="text-blue-600 flex-shrink-0" />
+              ) : (
+                <Folder size={16} className="text-blue-600 flex-shrink-0" />
+              )}
+              
+              <span
+                className="text-sm font-medium flex-1 truncate"
+                onClick={() => selectFolder(currentPath)}
+              >
+                {name}
+              </span>
+              
+              <div className="flex items-center space-x-1">
+                <span className="text-xs text-gray-500">{docCount}</span>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleCreateSubFolder(currentPath)
+                  }}
+                  className="p-1 hover:bg-blue-200 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                  title="Create sub-folder"
+                >
+                  <Plus size={12} className="text-blue-600" />
+                </button>
+              </div>
+            </div>
+            
+            {/* Render children if expanded */}
+            {isExpanded && hasChildren && (
+              <div>
+                {renderFolderTree(childNode, level + 1, currentPath)}
+              </div>
+            )}
+            
+            {/* Show documents in folder when selected */}
+            {isSelected && childNode.documents.length > 0 && (
+              <div style={{ paddingLeft: `${((level + 1) * 16) + 24}px` }} className="mt-1 space-y-1">
+                {childNode.documents.map((doc) => (
+                  <div
+                    key={doc.id}
+                    className="flex items-center space-x-2 p-1.5 rounded hover:bg-gray-50 text-gray-600"
+                  >
+                    <FileText size={12} />
+                    <span className="text-xs truncate flex-1">{doc.name}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )
+      })
+
+    return folders
   }
 
-  const filteredDocuments = getCurrentDocuments().filter(doc =>
+  const filteredDocuments = getDocumentsForPath(selectedPath).filter(doc =>
     doc.name.toLowerCase().includes(searchQuery.toLowerCase())
-  )
-
-  const filteredFolders = folders.filter(folder =>
-    folder.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    folder.documents.some(doc => doc.name.toLowerCase().includes(searchQuery.toLowerCase()))
   )
 
   if (loading) {
@@ -228,12 +345,15 @@ export default function FolderView() {
           <div>
             <h1 className="text-xl md:text-2xl font-semibold text-gray-900">Folder View</h1>
             <p className="text-sm text-gray-600 mt-1">
-              {folders.length} {folders.length === 1 ? 'folder' : 'folders'} • {documents.length + folders.reduce((sum, f) => sum + f.documentCount, 0)} documents
+              {folderTree.getDocumentCount()} documents in folders • {documents.length} in root
             </p>
           </div>
           <div className="flex items-center space-x-2">
             <button
-              onClick={() => setShowCreateFolder(true)}
+              onClick={() => {
+                setParentPath(null)
+                setShowCreateFolder(true)
+              }}
               className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
             >
               <Plus size={18} />
@@ -274,9 +394,9 @@ export default function FolderView() {
           
           {/* Root/Home indicator */}
           <div
-            onClick={() => setSelectedFolder(null)}
+            onClick={() => selectFolder('root')}
             className={`flex items-center space-x-2 p-2 rounded-lg cursor-pointer mb-2 ${
-              selectedFolder === null
+              selectedPath === 'root' || selectedPath === null
                 ? 'bg-blue-100 text-blue-700'
                 : 'hover:bg-gray-100 text-gray-700'
             }`}
@@ -288,7 +408,7 @@ export default function FolderView() {
 
           {/* Folder Tree */}
           <div className="space-y-1">
-            {filteredFolders.length === 0 && folders.length === 0 ? (
+            {folderTree.children.size === 0 ? (
               <div className="text-center py-8">
                 <Folder className="mx-auto text-gray-400 mb-2" size={32} />
                 <p className="text-sm text-gray-500">No folders yet</p>
@@ -297,51 +417,8 @@ export default function FolderView() {
                 </p>
               </div>
             ) : (
-              filteredFolders.map((folder) => {
-              const isExpanded = expandedFolders.has(folder.name)
-              const isSelected = selectedFolder === folder.name
-              
-              return (
-                <div key={folder.name} className="select-none">
-                  <div
-                    onClick={() => toggleFolder(folder.name)}
-                    className={`flex items-center space-x-2 p-2 rounded-lg cursor-pointer ${
-                      isSelected
-                        ? 'bg-blue-100 text-blue-700'
-                        : 'hover:bg-gray-100 text-gray-700'
-                    }`}
-                  >
-                    {isExpanded ? (
-                      <ChevronDown size={16} className="text-gray-500" />
-                    ) : (
-                      <ChevronRight size={16} className="text-gray-500" />
-                    )}
-                    {isExpanded ? (
-                      <FolderOpen size={18} className="text-blue-600" />
-                    ) : (
-                      <Folder size={18} className="text-blue-600" />
-                    )}
-                    <span className="text-sm font-medium flex-1 truncate">{folder.name}</span>
-                    <span className="text-xs text-gray-500">{folder.documentCount}</span>
-                  </div>
-                  
-                  {/* Documents in folder (when expanded) */}
-                  {isExpanded && (
-                    <div className="ml-6 mt-1 space-y-1">
-                      {folder.documents.map((doc) => (
-                        <div
-                          key={doc.id}
-                          className="flex items-center space-x-2 p-1.5 rounded hover:bg-gray-50 text-gray-600"
-                        >
-                          <FileText size={14} />
-                          <span className="text-xs truncate flex-1">{doc.name}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )
-            }))}
+              renderFolderTree(folderTree, 0, '')
+            )}
           </div>
         </div>
 
@@ -349,7 +426,9 @@ export default function FolderView() {
         <div className="lg:col-span-2 bg-white rounded-lg border border-gray-200 p-4 md:p-6 overflow-y-auto">
           <div className="mb-4">
             <h2 className="font-semibold text-gray-900 mb-1">
-              {selectedFolder ? `Documents in "${selectedFolder}"` : 'Documents in Root'}
+              {selectedPath && selectedPath !== 'root' 
+                ? `Documents in "${selectedPath}"` 
+                : 'Documents in Root'}
             </h2>
             <p className="text-sm text-gray-600">
               {filteredDocuments.length} {filteredDocuments.length === 1 ? 'document' : 'documents'}
@@ -443,7 +522,9 @@ export default function FolderView() {
       {showCreateFolder && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Create New Folder</h2>
+            <h2 className="text-xl font-bold text-gray-900 mb-4">
+              {parentPath ? `Create Sub-folder in "${parentPath}"` : 'Create New Folder'}
+            </h2>
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Folder Name
@@ -459,6 +540,7 @@ export default function FolderView() {
               />
               <p className="text-xs text-gray-500 mt-2">
                 Folders are created automatically when you upload documents to them.
+                {parentPath && <span className="block mt-1">Full path: <strong>{parentPath}/{newFolderName || '...'}</strong></span>}
               </p>
             </div>
             <div className="flex items-center justify-end space-x-3">
@@ -466,6 +548,7 @@ export default function FolderView() {
                 onClick={() => {
                   setShowCreateFolder(false)
                   setNewFolderName('')
+                  setParentPath(null)
                 }}
                 className="btn-secondary"
               >
@@ -487,23 +570,20 @@ export default function FolderView() {
         <UploadModal
           onClose={() => {
             setShowUpload(false)
-            // Reload folders after upload
             setTimeout(() => {
               loadFoldersAndDocuments()
             }, 1000)
           }}
           onSuccess={() => {
             setShowUpload(false)
-            // Reload folders after successful upload with a small delay
             setTimeout(() => {
               console.log('Reloading folders after upload...')
               loadFoldersAndDocuments()
             }, 1500)
           }}
-          defaultFolder={selectedFolder || newFolderName || undefined}
+          defaultFolder={selectedPath && selectedPath !== 'root' ? selectedPath : undefined}
         />
       )}
     </div>
   )
 }
-
