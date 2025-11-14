@@ -5,15 +5,17 @@ import {
   Folder, 
   FolderOpen, 
   FileText, 
-  ChevronRight, 
-  ChevronDown, 
-  Plus, 
+  ChevronRight,
   Upload,
   Eye,
   Download,
   Trash2,
   Search,
-  X
+  X,
+  Home,
+  Plus,
+  Grid,
+  List as ListIcon
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { format } from 'date-fns'
@@ -26,7 +28,6 @@ class FolderNode {
     this.path = path || name
     this.children = new Map()
     this.documents = []
-    this.expanded = false
   }
 
   addChild(name, path) {
@@ -45,14 +46,13 @@ class FolderNode {
 export default function FolderView() {
   const [folderTree, setFolderTree] = useState(new FolderNode('root', ''))
   const [documents, setDocuments] = useState([])
-  const [expandedPaths, setExpandedPaths] = useState(new Set())
-  const [selectedPath, setSelectedPath] = useState(null)
+  const [currentPath, setCurrentPath] = useState([]) // Breadcrumb path
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [showCreateFolder, setShowCreateFolder] = useState(false)
   const [newFolderName, setNewFolderName] = useState('')
-  const [parentPath, setParentPath] = useState(null) // For creating sub-folders
   const [showUpload, setShowUpload] = useState(false)
+  const [viewMode, setViewMode] = useState('grid') // 'grid' or 'list'
 
   useEffect(() => {
     loadFoldersAndDocuments()
@@ -62,73 +62,42 @@ export default function FolderView() {
     const root = new FolderNode('root', '')
     const rootDocs = []
 
-    console.log('Building folder tree from', docs.length, 'documents')
-    
-    docs.forEach((doc, index) => {
+    docs.forEach((doc) => {
       if (doc.s3_url) {
         try {
           const url = new URL(doc.s3_url)
           const pathParts = url.pathname.split('/').filter(p => p)
           
-          console.log(`Document ${index + 1}:`, doc.name)
-          console.log('  s3_url:', doc.s3_url)
-          console.log('  pathParts:', pathParts, 'length:', pathParts.length)
-          
           // Path structure: [bucket, user_id, folder_path, filename]
-          // Example: /docflow/user_id/Parent/SubFolder/filename.pdf
-          // pathParts = ['docflow', 'user_id', 'Parent', 'SubFolder', 'filename.pdf']
-          
           if (pathParts.length >= 4) {
-            // Everything after user_id and before filename is the folder path
             const folderPathParts = pathParts.slice(2, -1) // Skip bucket, user_id, and filename
-            
-            console.log('  folderPathParts:', folderPathParts)
             
             if (folderPathParts.length > 0) {
               // Build nested folder structure
               let current = root
               let currentPath = ''
               
-              folderPathParts.forEach((folderName, idx) => {
+              folderPathParts.forEach((folderName) => {
                 currentPath = currentPath ? `${currentPath}/${folderName}` : folderName
-                console.log(`    Level ${idx}: Adding folder "${folderName}" (path: "${currentPath}")`)
                 current = current.addChild(folderName, currentPath)
               })
               
               // Add document to the deepest folder
               current.documents.push(doc)
-              console.log(`  ✅ Added to folder: "${currentPath}"`)
             } else {
-              console.log('  📁 Document in root (no folder parts)')
               rootDocs.push(doc)
             }
           } else {
-            // Document in root (no folder)
-            console.log('  📁 Document in root (pathParts.length < 4)')
             rootDocs.push(doc)
           }
         } catch (e) {
-          console.error('  ❌ Error parsing URL:', e, doc.s3_url)
+          console.error('Error parsing URL:', e, doc.s3_url)
           rootDocs.push(doc)
         }
       } else {
-        console.log(`Document ${index + 1}:`, doc.name, '- No s3_url')
         rootDocs.push(doc)
       }
     })
-
-    console.log('Folder tree built:')
-    console.log('  Root children:', root.children.size)
-    console.log('  Root documents:', rootDocs.length)
-    
-    // Log all folder paths
-    const logFolderPaths = (node, prefix = '') => {
-      node.children.forEach((child, name) => {
-        console.log(`  ${prefix}📁 ${name} (${child.documents.length} docs, ${child.children.size} sub-folders)`)
-        logFolderPaths(child, prefix + '  ')
-      })
-    }
-    logFolderPaths(root)
 
     return { root, rootDocs }
   }
@@ -143,23 +112,8 @@ export default function FolderView() {
       
       const { root, rootDocs } = buildFolderTree(docs)
       
-      console.log('Setting folder tree state:')
-      console.log('  Root has', root.children.size, 'children')
-      console.log('  Root documents:', rootDocs.length)
-      
       setFolderTree(root)
       setDocuments(rootDocs)
-      
-      // Auto-expand root if it has children
-      if (root.children.size > 0) {
-        setExpandedPaths(new Set(['root']))
-        // Auto-select first folder
-        const firstFolder = Array.from(root.children.keys())[0]
-        if (firstFolder) {
-          const firstChild = root.children.get(firstFolder)
-          setSelectedPath(firstChild.path)
-        }
-      }
     } catch (error) {
       console.error('Failed to load folders:', error)
       toast.error('Failed to load folders: ' + (error.response?.data?.detail || error.message))
@@ -168,35 +122,43 @@ export default function FolderView() {
     }
   }
 
-  const toggleFolder = (path) => {
-    const newExpanded = new Set(expandedPaths)
-    if (newExpanded.has(path)) {
-      newExpanded.delete(path)
-    } else {
-      newExpanded.add(path)
+  // Get current folder node based on breadcrumb path
+  const getCurrentFolder = () => {
+    let current = folderTree
+    for (const folderName of currentPath) {
+      if (current.children.has(folderName)) {
+        current = current.children.get(folderName)
+      } else {
+        return null
+      }
     }
-    setExpandedPaths(newExpanded)
+    return current
   }
 
-  const selectFolder = (path) => {
-    setSelectedPath(path)
+  // Navigate into a folder
+  const navigateToFolder = (folderName) => {
+    setCurrentPath([...currentPath, folderName])
   }
 
-  const getFolderByPath = (node, pathParts, index = 0) => {
-    if (index >= pathParts.length) return node
-    const child = node.children.get(pathParts[index])
-    if (!child) return null
-    return getFolderByPath(child, pathParts, index + 1)
+  // Navigate to a specific path
+  const navigateToPath = (pathArray) => {
+    setCurrentPath(pathArray)
   }
 
-  const getDocumentsForPath = (path) => {
-    if (!path || path === 'root') {
-      return documents
+  // Get current folder's children and documents
+  const getCurrentContent = () => {
+    const current = getCurrentFolder()
+    if (!current) {
+      // We're at root
+      return {
+        folders: Array.from(folderTree.children.values()),
+        documents: documents
+      }
     }
-    
-    const pathParts = path.split('/')
-    const folder = getFolderByPath(folderTree, pathParts)
-    return folder ? folder.documents : []
+    return {
+      folders: Array.from(current.children.values()),
+      documents: current.documents
+    }
   }
 
   const handleCreateFolder = () => {
@@ -206,28 +168,31 @@ export default function FolderView() {
     }
     
     const trimmedName = newFolderName.trim()
-    const fullPath = parentPath ? `${parentPath}/${trimmedName}` : trimmedName
+    const current = getCurrentFolder()
+    const fullPath = currentPath.length > 0 
+      ? `${currentPath.join('/')}/${trimmedName}` 
+      : trimmedName
     
     // Check if folder already exists
-    const pathParts = fullPath.split('/')
-    const existingFolder = getFolderByPath(folderTree, pathParts)
-    if (existingFolder) {
-      toast.error('Folder already exists')
-      return
+    if (current) {
+      if (current.children.has(trimmedName)) {
+        toast.error('Folder already exists')
+        return
+      }
+    } else {
+      if (folderTree.children.has(trimmedName)) {
+        toast.error('Folder already exists')
+        return
+      }
     }
     
     // Folders are created when documents are uploaded to them
-    setSelectedPath(fullPath)
     setShowCreateFolder(false)
     setNewFolderName('')
-    setParentPath(null)
     setShowUpload(true)
+    // Store the folder path to use in upload
+    sessionStorage.setItem('pendingFolder', fullPath)
     toast(`Upload a document to create the folder "${fullPath}"`, { icon: 'ℹ️' })
-  }
-
-  const handleCreateSubFolder = (parentPath) => {
-    setParentPath(parentPath)
-    setShowCreateFolder(true)
   }
 
   const handleDeleteDocument = async (docName) => {
@@ -260,108 +225,13 @@ export default function FolderView() {
     }
   }
 
-  const renderFolderTree = (node, level = 0, parentPath = '') => {
-    if (node.name === 'root' && node.children.size === 0) {
-      return null
-    }
+  const { folders, documents: currentDocs } = getCurrentContent()
 
-    const folders = []
-    
-    // Render children folders
-    Array.from(node.children.entries())
-      .sort(([a], [b]) => a.localeCompare(b))
-      .forEach(([name, childNode]) => {
-        const currentPath = parentPath ? `${parentPath}/${name}` : name
-        const isExpanded = expandedPaths.has(currentPath)
-        const isSelected = selectedPath === currentPath
-        const hasChildren = childNode.children.size > 0
-        const docCount = childNode.getDocumentCount()
+  const filteredFolders = folders.filter(folder =>
+    folder.name.toLowerCase().includes(searchQuery.toLowerCase())
+  )
 
-        folders.push(
-          <div key={currentPath} className="select-none">
-            <div
-              className={`group flex items-center space-x-2 p-2 rounded-lg cursor-pointer ${
-                isSelected
-                  ? 'bg-blue-100 text-blue-700'
-                  : 'hover:bg-gray-100 text-gray-700'
-              }`}
-              style={{ paddingLeft: `${(level * 16) + 8}px` }}
-            >
-              {hasChildren ? (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    toggleFolder(currentPath)
-                  }}
-                  className="p-0.5 hover:bg-gray-200 rounded"
-                >
-                  {isExpanded ? (
-                    <ChevronDown size={14} className="text-gray-500" />
-                  ) : (
-                    <ChevronRight size={14} className="text-gray-500" />
-                  )}
-                </button>
-              ) : (
-                <div className="w-4" /> // Spacer for alignment
-              )}
-              
-              {isExpanded ? (
-                <FolderOpen size={16} className="text-blue-600 flex-shrink-0" />
-              ) : (
-                <Folder size={16} className="text-blue-600 flex-shrink-0" />
-              )}
-              
-              <span
-                className="text-sm font-medium flex-1 truncate"
-                onClick={() => selectFolder(currentPath)}
-              >
-                {name}
-              </span>
-              
-              <div className="flex items-center space-x-1">
-                <span className="text-xs text-gray-500">{docCount}</span>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    handleCreateSubFolder(currentPath)
-                  }}
-                  className="p-1 hover:bg-blue-200 rounded opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
-                  title="Create sub-folder"
-                >
-                  <Plus size={12} className="text-blue-600" />
-                </button>
-              </div>
-            </div>
-            
-            {/* Render children if expanded */}
-            {isExpanded && hasChildren && (
-              <div>
-                {renderFolderTree(childNode, level + 1, currentPath)}
-              </div>
-            )}
-            
-            {/* Show documents in folder when selected */}
-            {isSelected && childNode.documents.length > 0 && (
-              <div style={{ paddingLeft: `${((level + 1) * 16) + 24}px` }} className="mt-1 space-y-1">
-                {childNode.documents.map((doc) => (
-                  <div
-                    key={doc.id}
-                    className="flex items-center space-x-2 p-1.5 rounded hover:bg-gray-50 text-gray-600"
-                  >
-                    <FileText size={12} />
-                    <span className="text-xs truncate flex-1">{doc.name}</span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )
-      })
-
-    return folders
-  }
-
-  const filteredDocuments = getDocumentsForPath(selectedPath).filter(doc =>
+  const filteredDocuments = currentDocs.filter(doc =>
     doc.name.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
@@ -379,17 +249,14 @@ export default function FolderView() {
       <div className="mb-4 md:mb-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
           <div>
-            <h1 className="text-xl md:text-2xl font-semibold text-gray-900">Folder View</h1>
+            <h1 className="text-xl md:text-2xl font-semibold text-gray-900">Folders</h1>
             <p className="text-sm text-gray-600 mt-1">
-              {folderTree.getDocumentCount()} documents in folders • {documents.length} in root
+              {folders.length} {folders.length === 1 ? 'folder' : 'folders'} • {currentDocs.length} {currentDocs.length === 1 ? 'document' : 'documents'}
             </p>
           </div>
           <div className="flex items-center space-x-2">
             <button
-              onClick={() => {
-                setParentPath(null)
-                setShowCreateFolder(true)
-              }}
+              onClick={() => setShowCreateFolder(true)}
               className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
             >
               <Plus size={18} />
@@ -405,153 +272,245 @@ export default function FolderView() {
           </div>
         </div>
 
-        {/* Search */}
+        {/* Breadcrumb Navigation */}
+        <div className="bg-white rounded-lg border border-gray-200 p-3 mb-4">
+          <div className="flex items-center space-x-2 flex-wrap">
+            <button
+              onClick={() => navigateToPath([])}
+              className="flex items-center space-x-1 text-gray-600 hover:text-blue-600"
+            >
+              <Home size={16} />
+              <span className="text-sm font-medium">My Home</span>
+            </button>
+            {currentPath.map((folderName, index) => (
+              <div key={index} className="flex items-center space-x-2">
+                <ChevronRight size={16} className="text-gray-400" />
+                <button
+                  onClick={() => navigateToPath(currentPath.slice(0, index + 1))}
+                  className="text-sm font-medium text-gray-600 hover:text-blue-600"
+                >
+                  {folderName}
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Search and View Controls */}
         <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-            <input
-              type="text"
-              placeholder="Search folders and documents..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-            />
+          <div className="flex items-center justify-between gap-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+              <input
+                type="text"
+                placeholder="Quick search..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+              />
+            </div>
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={() => setViewMode('grid')}
+                className={`p-2 rounded-lg ${viewMode === 'grid' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}`}
+                title="Grid view"
+              >
+                <Grid size={20} />
+              </button>
+              <button
+                onClick={() => setViewMode('list')}
+                className={`p-2 rounded-lg ${viewMode === 'list' ? 'bg-blue-100 text-blue-700' : 'text-gray-600 hover:bg-gray-100'}`}
+                title="List view"
+              >
+                <ListIcon size={20} />
+              </button>
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6 min-h-0">
-        {/* Folder Tree */}
-        <div className="lg:col-span-1 bg-white rounded-lg border border-gray-200 p-4 overflow-y-auto">
-          <h2 className="font-semibold text-gray-900 mb-3 flex items-center space-x-2">
-            <Folder size={20} />
-            <span>Folders</span>
-          </h2>
-          
-          {/* Root/Home indicator */}
-          <div
-            onClick={() => selectFolder('root')}
-            className={`flex items-center space-x-2 p-2 rounded-lg cursor-pointer mb-2 ${
-              selectedPath === 'root' || selectedPath === null
-                ? 'bg-blue-100 text-blue-700'
-                : 'hover:bg-gray-100 text-gray-700'
-            }`}
-          >
-            <Folder size={18} />
-            <span className="text-sm font-medium">Home (Root)</span>
-            <span className="ml-auto text-xs text-gray-500">({documents.length})</span>
-          </div>
-
-          {/* Folder Tree */}
-          <div className="space-y-1">
-            {folderTree.children.size === 0 ? (
-              <div className="text-center py-8">
-                <Folder className="mx-auto text-gray-400 mb-2" size={32} />
-                <p className="text-sm text-gray-500">No folders yet</p>
-                <p className="text-xs text-gray-400 mt-1">
-                  Create a folder and upload documents to it
-                </p>
-              </div>
-            ) : (
-              renderFolderTree(folderTree, 0, '')
-            )}
-          </div>
-        </div>
-
-        {/* Documents View */}
-        <div className="lg:col-span-2 bg-white rounded-lg border border-gray-200 p-4 md:p-6 overflow-y-auto">
-          <div className="mb-4">
-            <h2 className="font-semibold text-gray-900 mb-1">
-              {selectedPath && selectedPath !== 'root' 
-                ? `Documents in "${selectedPath}"` 
-                : 'Documents in Root'}
-            </h2>
-            <p className="text-sm text-gray-600">
-              {filteredDocuments.length} {filteredDocuments.length === 1 ? 'document' : 'documents'}
+      {/* Content Area */}
+      <div className="flex-1 overflow-y-auto">
+        {filteredFolders.length === 0 && filteredDocuments.length === 0 ? (
+          <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
+            <Folder className="mx-auto text-gray-400 mb-4" size={64} />
+            <p className="text-gray-500 mb-2 text-lg">This folder is empty</p>
+            <p className="text-sm text-gray-400 mb-4">
+              {searchQuery ? 'No items match your search' : 'Create a folder or upload a document to get started'}
             </p>
-          </div>
-
-          {filteredDocuments.length === 0 ? (
-            <div className="text-center py-12">
-              <FileText className="mx-auto text-gray-400 mb-4" size={48} />
-              <p className="text-gray-500 mb-4">
-                {searchQuery ? 'No documents match your search' : 'No documents in this location'}
-              </p>
-              {!searchQuery && (
+            {!searchQuery && (
+              <div className="flex items-center justify-center space-x-3">
+                <button
+                  onClick={() => setShowCreateFolder(true)}
+                  className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700"
+                >
+                  New Folder
+                </button>
                 <button
                   onClick={() => setShowUpload(true)}
-                  className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700"
+                  className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700"
                 >
                   Upload Document
                 </button>
-              )}
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {filteredDocuments.map((doc) => (
-                <div
-                  key={doc.id}
-                  className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
-                >
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center space-x-3 flex-1 min-w-0">
-                      <div className="p-2 bg-blue-100 rounded-lg flex-shrink-0">
-                        <FileText className="text-blue-600" size={20} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-medium text-gray-900 truncate" title={doc.name}>
-                          {doc.name}
-                        </h3>
-                        <p className="text-xs text-gray-500 mt-1">
-                          {format(new Date(doc.created_at), 'MMM dd, yyyy')} • {(doc.size / 1024).toFixed(1)} KB
-                        </p>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className={viewMode === 'grid' ? 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4' : 'space-y-2'}>
+            {/* Folders */}
+            {filteredFolders.map((folder) => (
+              <div
+                key={folder.path}
+                onClick={() => navigateToFolder(folder.name)}
+                className={`bg-white rounded-lg border-2 border-gray-200 hover:border-blue-400 hover:shadow-lg transition-all cursor-pointer ${
+                  viewMode === 'grid' ? 'p-6 text-center' : 'p-4 flex items-center space-x-4'
+                }`}
+              >
+                {viewMode === 'grid' ? (
+                  <>
+                    <div className="mb-3 flex justify-center">
+                      <div className="p-4 bg-yellow-100 rounded-lg">
+                        <Folder size={48} className="text-yellow-600" />
                       </div>
                     </div>
-                  </div>
-
-                  {/* Tags */}
-                  {doc.tags && doc.tags.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mb-3">
-                      {doc.tags.slice(0, 3).map((tag) => (
-                        <span
-                          key={tag}
-                          className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full"
-                        >
-                          {tag}
-                        </span>
-                      ))}
+                    <h3 className="font-medium text-gray-900 truncate" title={folder.name}>
+                      {folder.name}
+                    </h3>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {folder.getDocumentCount()} {folder.getDocumentCount() === 1 ? 'item' : 'items'}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <div className="p-3 bg-yellow-100 rounded-lg">
+                      <Folder size={24} className="text-yellow-600" />
                     </div>
-                  )}
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-medium text-gray-900 truncate" title={folder.name}>
+                        {folder.name}
+                      </h3>
+                      <p className="text-xs text-gray-500">
+                        {folder.getDocumentCount()} {folder.getDocumentCount() === 1 ? 'item' : 'items'}
+                      </p>
+                    </div>
+                    <ChevronRight size={20} className="text-gray-400" />
+                  </>
+                )}
+              </div>
+            ))}
 
-                  {/* Actions */}
-                  <div className="flex items-center space-x-2">
-                    <Link
-                      to={`/documents/${doc.id}`}
-                      className="flex-1 px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium flex items-center justify-center space-x-1"
-                    >
-                      <Eye size={14} />
-                      <span>View</span>
-                    </Link>
-                    <button
-                      onClick={() => handleDownload(doc)}
-                      className="px-3 py-1.5 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
-                      title="Download"
-                    >
-                      <Download size={14} />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteDocument(doc.name)}
-                      className="px-3 py-1.5 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors"
-                      title="Delete"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+            {/* Documents */}
+            {filteredDocuments.map((doc) => (
+              <div
+                key={doc.id}
+                className={`bg-white rounded-lg border-2 border-gray-200 hover:border-blue-400 hover:shadow-lg transition-all ${
+                  viewMode === 'grid' ? 'p-6 text-center' : 'p-4 flex items-center space-x-4'
+                }`}
+              >
+                {viewMode === 'grid' ? (
+                  <>
+                    <div className="mb-3 flex justify-center">
+                      <div className="p-4 bg-blue-100 rounded-lg">
+                        <FileText size={48} className="text-blue-600" />
+                      </div>
+                    </div>
+                    <h3 className="font-medium text-gray-900 truncate text-sm mb-1" title={doc.name}>
+                      {doc.name}
+                    </h3>
+                    <p className="text-xs text-gray-500">
+                      {(doc.size / 1024).toFixed(1)} KB
+                    </p>
+                    <div className="mt-2 flex items-center justify-center space-x-1">
+                      <Link
+                        to={`/documents/${doc.id}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="p-1.5 bg-blue-600 text-white rounded hover:bg-blue-700"
+                        title="View"
+                      >
+                        <Eye size={14} />
+                      </Link>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleDownload(doc)
+                        }}
+                        className="p-1.5 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+                        title="Download"
+                      >
+                        <Download size={14} />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleDeleteDocument(doc.name)
+                        }}
+                        className="p-1.5 bg-red-100 text-red-700 rounded hover:bg-red-200"
+                        title="Delete"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="p-3 bg-blue-100 rounded-lg">
+                      <FileText size={24} className="text-blue-600" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-medium text-gray-900 truncate" title={doc.name}>
+                        {doc.name}
+                      </h3>
+                      <p className="text-xs text-gray-500">
+                        {format(new Date(doc.created_at), 'MMM dd, yyyy')} • {(doc.size / 1024).toFixed(1)} KB
+                      </p>
+                      {doc.tags && doc.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {doc.tags.slice(0, 2).map((tag) => (
+                            <span
+                              key={tag}
+                              className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full"
+                            >
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Link
+                        to={`/documents/${doc.id}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+                      >
+                        View
+                      </Link>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleDownload(doc)
+                        }}
+                        className="p-1.5 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+                        title="Download"
+                      >
+                        <Download size={16} />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleDeleteDocument(doc.name)
+                        }}
+                        className="p-1.5 bg-red-100 text-red-700 rounded-lg hover:bg-red-200"
+                        title="Delete"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Create Folder Modal */}
@@ -559,7 +518,9 @@ export default function FolderView() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
             <h2 className="text-xl font-bold text-gray-900 mb-4">
-              {parentPath ? `Create Sub-folder in "${parentPath}"` : 'Create New Folder'}
+              {currentPath.length > 0 
+                ? `Create Folder in "${currentPath.join(' / ')}"` 
+                : 'Create New Folder'}
             </h2>
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -576,7 +537,6 @@ export default function FolderView() {
               />
               <p className="text-xs text-gray-500 mt-2">
                 Folders are created automatically when you upload documents to them.
-                {parentPath && <span className="block mt-1">Full path: <strong>{parentPath}/{newFolderName || '...'}</strong></span>}
               </p>
             </div>
             <div className="flex items-center justify-end space-x-3">
@@ -584,7 +544,6 @@ export default function FolderView() {
                 onClick={() => {
                   setShowCreateFolder(false)
                   setNewFolderName('')
-                  setParentPath(null)
                 }}
                 className="btn-secondary"
               >
@@ -606,25 +565,22 @@ export default function FolderView() {
         <UploadModal
           onClose={() => {
             setShowUpload(false)
+            sessionStorage.removeItem('pendingFolder')
             setTimeout(() => {
               loadFoldersAndDocuments()
             }, 1000)
           }}
           onSuccess={() => {
             setShowUpload(false)
-            // Reload immediately and then again after a delay to ensure data is fresh
-            console.log('Upload successful, reloading folders...')
+            sessionStorage.removeItem('pendingFolder')
             setTimeout(() => {
               loadFoldersAndDocuments()
-            }, 500)
-            setTimeout(() => {
-              console.log('Second reload to ensure folders are visible...')
-              loadFoldersAndDocuments()
-            }, 2000)
+            }, 1500)
           }}
-          defaultFolder={selectedPath && selectedPath !== 'root' ? selectedPath : undefined}
+          defaultFolder={sessionStorage.getItem('pendingFolder') || (currentPath.length > 0 ? currentPath.join('/') : undefined)}
         />
       )}
     </div>
   )
 }
+
