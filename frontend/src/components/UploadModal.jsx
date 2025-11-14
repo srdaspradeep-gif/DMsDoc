@@ -1,7 +1,7 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { useDropzone } from 'react-dropzone'
 import { api } from '../services/api'
-import { Upload, X, File, Loader } from 'lucide-react'
+import { Upload, X, File, Loader, Folder, FolderPlus } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 export default function UploadModal({ onClose, onSuccess }) {
@@ -9,9 +9,50 @@ export default function UploadModal({ onClose, onSuccess }) {
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState({})
   const [tags, setTags] = useState('')
+  const [category, setCategory] = useState('')
+  const [categories, setCategories] = useState([])
+  const [showNewCategory, setShowNewCategory] = useState(false)
+  const [newCategoryName, setNewCategoryName] = useState('')
+  const [folder, setFolder] = useState('')
+  const [folders, setFolders] = useState([])
+  const [showNewFolder, setShowNewFolder] = useState(false)
+  const [newFolderName, setNewFolderName] = useState('')
   const [customMetadata, setCustomMetadata] = useState({})
   const [newMetadataKey, setNewMetadataKey] = useState('')
   const [newMetadataValue, setNewMetadataValue] = useState('')
+
+  useEffect(() => {
+    loadCategoriesAndFolders()
+  }, [])
+
+  const loadCategoriesAndFolders = async () => {
+    try {
+      // Load existing categories and folders from documents
+      const response = await api.get('/v2/metadata?limit=99&offset=0')
+      const data = response.data
+      const docsKey = Object.keys(data).find(key => key.startsWith('documents of '))
+      const docs = docsKey ? (data[docsKey] || []) : []
+      
+      // Extract unique categories
+      const uniqueCategories = [...new Set(docs.flatMap(doc => doc.categories || []).filter(Boolean))]
+      setCategories(uniqueCategories.sort())
+      
+      // Extract unique folders (from s3_url path structure)
+      const uniqueFolders = [...new Set(docs.map(doc => {
+        if (doc.s3_url) {
+          const parts = doc.s3_url.split('/')
+          // Extract folder from path like: http://minio:9000/docflow/user_id/folder/file.pdf
+          if (parts.length > 4) {
+            return parts[parts.length - 2] // Second to last part is usually the folder
+          }
+        }
+        return null
+      }).filter(Boolean))]
+      setFolders(uniqueFolders.sort())
+    } catch (error) {
+      console.error('Failed to load categories and folders:', error)
+    }
+  }
 
   const onDrop = useCallback((acceptedFiles) => {
     setFiles(prev => [...prev, ...acceptedFiles.map(file => ({
@@ -48,9 +89,52 @@ export default function UploadModal({ onClose, onSuccess }) {
     })
   }
 
+  const handleAddCategory = () => {
+    if (!newCategoryName.trim()) {
+      toast.error('Please enter a category name')
+      return
+    }
+    
+    const trimmedCategory = newCategoryName.trim()
+    if (categories.includes(trimmedCategory)) {
+      toast.error('Category already exists')
+      return
+    }
+    
+    setCategories([...categories, trimmedCategory].sort())
+    setCategory(trimmedCategory)
+    setNewCategoryName('')
+    setShowNewCategory(false)
+    toast.success('Category added')
+  }
+
+  const handleAddFolder = () => {
+    if (!newFolderName.trim()) {
+      toast.error('Please enter a folder name')
+      return
+    }
+    
+    const trimmedFolder = newFolderName.trim()
+    if (folders.includes(trimmedFolder)) {
+      toast.error('Folder already exists')
+      return
+    }
+    
+    setFolders([...folders, trimmedFolder].sort())
+    setFolder(trimmedFolder)
+    setNewFolderName('')
+    setShowNewFolder(false)
+    toast.success('Folder added')
+  }
+
   const handleUpload = async () => {
     if (files.length === 0) {
       toast.error('Please select at least one file')
+      return
+    }
+
+    if (!category || !category.trim()) {
+      toast.error('Please select or create a category. Categories are required for standardization.')
       return
     }
 
@@ -61,6 +145,11 @@ export default function UploadModal({ onClose, onSuccess }) {
       formData.append('files', file)
     })
 
+    // Add folder if specified
+    if (folder && folder.trim()) {
+      formData.append('folder', folder.trim())
+    }
+
     try {
       const response = await api.post('/v2/upload', formData, {
         headers: {
@@ -68,21 +157,26 @@ export default function UploadModal({ onClose, onSuccess }) {
         },
       })
 
-      // Update metadata with tags and custom metadata if provided
-      if (tags || Object.keys(customMetadata).length > 0) {
-        const uploadedDocs = Array.isArray(response.data) ? response.data : [response.data]
-        for (const doc of uploadedDocs) {
-          const updateData = {}
-          if (tags) {
-            updateData.tags = tags.split(',').map(t => t.trim())
-          }
-          if (Object.keys(customMetadata).length > 0) {
-            updateData.custom_metadata = customMetadata
-          }
-          
-          if (Object.keys(updateData).length > 0) {
-            await api.put(`/v2/metadata/${doc.name}`, updateData)
-          }
+      // Update metadata with tags, category, and custom metadata
+      const uploadedDocs = Array.isArray(response.data) ? response.data : [response.data]
+      for (const doc of uploadedDocs) {
+        const updateData = {}
+        
+        // Category is required
+        if (category) {
+          updateData.categories = [category.trim()]
+        }
+        
+        if (tags) {
+          updateData.tags = tags.split(',').map(t => t.trim()).filter(Boolean)
+        }
+        
+        if (Object.keys(customMetadata).length > 0) {
+          updateData.custom_metadata = customMetadata
+        }
+        
+        if (Object.keys(updateData).length > 0) {
+          await api.put(`/v2/metadata/${doc.name}`, updateData)
         }
       }
 
@@ -159,10 +253,129 @@ export default function UploadModal({ onClose, onSuccess }) {
             </div>
           )}
 
+          {/* Category - Required */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Category <span className="text-red-500">*</span>
+            </label>
+            <div className="flex space-x-2">
+              <select
+                value={category}
+                onChange={(e) => {
+                  if (e.target.value === '__new__') {
+                    setShowNewCategory(true)
+                    setCategory('')
+                  } else {
+                    setCategory(e.target.value)
+                    setShowNewCategory(false)
+                  }
+                }}
+                className="input-field flex-1"
+                required
+              >
+                <option value="">Select a category...</option>
+                {categories.map((cat) => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
+                <option value="__new__">+ Create New Category</option>
+              </select>
+            </div>
+            {showNewCategory && (
+              <div className="mt-2 flex space-x-2">
+                <input
+                  type="text"
+                  value={newCategoryName}
+                  onChange={(e) => setNewCategoryName(e.target.value)}
+                  placeholder="New category name"
+                  className="input-field flex-1"
+                  onKeyPress={(e) => e.key === 'Enter' && handleAddCategory()}
+                />
+                <button
+                  onClick={handleAddCategory}
+                  className="btn-secondary whitespace-nowrap"
+                >
+                  Add
+                </button>
+                <button
+                  onClick={() => {
+                    setShowNewCategory(false)
+                    setNewCategoryName('')
+                    setCategory('')
+                  }}
+                  className="btn-secondary"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            )}
+            {category && !showNewCategory && (
+              <p className="text-xs text-gray-500 mt-1">Selected: <strong>{category}</strong></p>
+            )}
+          </div>
+
+          {/* Folder - Optional */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Folder (Optional)
+            </label>
+            <div className="flex space-x-2">
+              <select
+                value={folder}
+                onChange={(e) => {
+                  if (e.target.value === '__new__') {
+                    setShowNewFolder(true)
+                    setFolder('')
+                  } else {
+                    setFolder(e.target.value)
+                    setShowNewFolder(false)
+                  }
+                }}
+                className="input-field flex-1"
+              >
+                <option value="">No folder (root)</option>
+                {folders.map((fold) => (
+                  <option key={fold} value={fold}>{fold}</option>
+                ))}
+                <option value="__new__">+ Create New Folder</option>
+              </select>
+            </div>
+            {showNewFolder && (
+              <div className="mt-2 flex space-x-2">
+                <input
+                  type="text"
+                  value={newFolderName}
+                  onChange={(e) => setNewFolderName(e.target.value)}
+                  placeholder="New folder name"
+                  className="input-field flex-1"
+                  onKeyPress={(e) => e.key === 'Enter' && handleAddFolder()}
+                />
+                <button
+                  onClick={handleAddFolder}
+                  className="btn-secondary whitespace-nowrap"
+                >
+                  Add
+                </button>
+                <button
+                  onClick={() => {
+                    setShowNewFolder(false)
+                    setNewFolderName('')
+                    setFolder('')
+                  }}
+                  className="btn-secondary"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            )}
+            {folder && !showNewFolder && (
+              <p className="text-xs text-gray-500 mt-1">Selected: <strong>{folder}</strong></p>
+            )}
+          </div>
+
           {/* Tags */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Tags (comma-separated)
+              Tags (comma-separated, optional)
             </label>
             <input
               type="text"
@@ -229,7 +442,7 @@ export default function UploadModal({ onClose, onSuccess }) {
           </button>
           <button
             onClick={handleUpload}
-            disabled={uploading || files.length === 0}
+            disabled={uploading || files.length === 0 || !category}
             className="btn-primary flex items-center space-x-2 disabled:opacity-50"
           >
             {uploading ? (

@@ -30,11 +30,46 @@ export default function Documents() {
   const [showUpload, setShowUpload] = useState(false)
   const [viewMode, setViewMode] = useState('grid') // 'grid' or 'list'
   const [selectedTags, setSelectedTags] = useState([])
+  const [selectedCategory, setSelectedCategory] = useState('')
+  const [selectedFolder, setSelectedFolder] = useState('')
+  const [categories, setCategories] = useState([])
+  const [folders, setFolders] = useState([])
   const [sortBy, setSortBy] = useState('created')
   const [sortOrder, setSortOrder] = useState('desc')
   const [currentPage, setCurrentPage] = useState(1)
   const [totalDocs, setTotalDocs] = useState(0)
   const itemsPerPage = 20
+
+  useEffect(() => {
+    loadCategoriesAndFolders()
+  }, [])
+
+  const loadCategoriesAndFolders = async () => {
+    try {
+      const response = await api.get('/v2/metadata?limit=99&offset=0')
+      const data = response.data
+      const docsKey = Object.keys(data).find(key => key.startsWith('documents of '))
+      const docs = docsKey ? (data[docsKey] || []) : []
+      
+      // Extract unique categories
+      const uniqueCategories = [...new Set(docs.flatMap(doc => doc.categories || []).filter(Boolean))]
+      setCategories(uniqueCategories.sort())
+      
+      // Extract unique folders from s3_url
+      const uniqueFolders = [...new Set(docs.map(doc => {
+        if (doc.s3_url) {
+          const parts = doc.s3_url.split('/')
+          if (parts.length > 4) {
+            return parts[parts.length - 2]
+          }
+        }
+        return null
+      }).filter(Boolean))]
+      setFolders(uniqueFolders.sort())
+    } catch (error) {
+      console.error('Failed to load categories and folders:', error)
+    }
+  }
 
   useEffect(() => {
     loadDocuments()
@@ -123,9 +158,29 @@ export default function Documents() {
   const allTags = [...new Set(documents.flatMap(doc => doc.tags || []))]
 
   const filteredDocuments = documents.filter((doc) => {
+    // Filter by tags
     if (selectedTags.length > 0) {
-      return selectedTags.some(tag => doc.tags && doc.tags.includes(tag))
+      const hasTag = selectedTags.some(tag => doc.tags && doc.tags.includes(tag))
+      if (!hasTag) return false
     }
+    
+    // Filter by category
+    if (selectedCategory) {
+      const hasCategory = doc.categories && doc.categories.includes(selectedCategory)
+      if (!hasCategory) return false
+    }
+    
+    // Filter by folder
+    if (selectedFolder) {
+      if (doc.s3_url) {
+        const parts = doc.s3_url.split('/')
+        const docFolder = parts.length > 4 ? parts[parts.length - 2] : null
+        if (docFolder !== selectedFolder) return false
+      } else {
+        return false
+      }
+    }
+    
     return true
   })
 
@@ -180,9 +235,37 @@ export default function Documents() {
                 <span>Added</span>
               </button>
 
-              {selectedTags.length > 0 && (
+              {/* Category Filter */}
+              <select
+                value={selectedCategory}
+                onChange={(e) => setSelectedCategory(e.target.value)}
+                className="px-2 md:px-3 py-1.5 text-xs md:text-sm border border-gray-300 rounded-lg hover:bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+              >
+                <option value="">All Categories</option>
+                {categories.map((cat) => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
+              </select>
+
+              {/* Folder Filter */}
+              <select
+                value={selectedFolder}
+                onChange={(e) => setSelectedFolder(e.target.value)}
+                className="px-2 md:px-3 py-1.5 text-xs md:text-sm border border-gray-300 rounded-lg hover:bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+              >
+                <option value="">All Folders</option>
+                {folders.map((fold) => (
+                  <option key={fold} value={fold}>{fold}</option>
+                ))}
+              </select>
+
+              {(selectedTags.length > 0 || selectedCategory || selectedFolder) && (
                 <button
-                  onClick={() => setSelectedTags([])}
+                  onClick={() => {
+                    setSelectedTags([])
+                    setSelectedCategory('')
+                    setSelectedFolder('')
+                  }}
                   className="px-2 md:px-3 py-1.5 text-xs md:text-sm border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center space-x-1 md:space-x-2 text-red-600"
                 >
                   <X size={14} />
@@ -259,11 +342,11 @@ export default function Documents() {
         <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
           <FileText className="mx-auto text-gray-400 mb-4" size={48} />
           <p className="text-gray-500 mb-4">
-            {selectedTags.length > 0 
+            {(selectedTags.length > 0 || selectedCategory || selectedFolder)
               ? 'No documents match your filters'
               : 'No documents yet'}
           </p>
-          {selectedTags.length === 0 && (
+          {(selectedTags.length === 0 && !selectedCategory && !selectedFolder) && (
             <button onClick={() => setShowUpload(true)} className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">
               Upload your first document
             </button>
