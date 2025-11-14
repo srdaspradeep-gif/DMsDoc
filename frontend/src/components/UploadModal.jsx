@@ -151,16 +151,19 @@ export default function UploadModal({ onClose, onSuccess, defaultFolder = null }
     }
     
     const trimmedFolder = newFolderName.trim()
-    if (folders.includes(trimmedFolder)) {
+    // If a folder is already selected, create a sub-folder
+    const fullPath = folder ? `${folder}/${trimmedFolder}` : trimmedFolder
+    
+    if (folders.includes(fullPath)) {
       toast.error('Folder already exists')
       return
     }
     
-    setFolders([...folders, trimmedFolder].sort())
-    setFolder(trimmedFolder)
+    setFolders([...folders, fullPath].sort())
+    setFolder(fullPath)
     setNewFolderName('')
     setShowNewFolder(false)
-    toast.success('Folder added')
+    toast.success(`Folder "${fullPath}" will be created when you upload`)
   }
 
   const handleUpload = async () => {
@@ -365,6 +368,14 @@ export default function UploadModal({ onClose, onSuccess, defaultFolder = null }
                   if (e.target.value === '__new__') {
                     setShowNewFolder(true)
                     setFolder('')
+                  } else if (e.target.value === '__new_sub__') {
+                    if (folder) {
+                      // Create sub-folder in currently selected folder
+                      setShowNewFolder(true)
+                      // Keep current folder as parent
+                    } else {
+                      toast.error('Please select a parent folder first')
+                    }
                   } else {
                     setFolder(e.target.value)
                     setShowNewFolder(false)
@@ -377,18 +388,19 @@ export default function UploadModal({ onClose, onSuccess, defaultFolder = null }
                   <option key={fold} value={fold}>{fold}</option>
                 ))}
                 <option value="__new__">+ Create New Folder</option>
+                <option value="__new_sub__">+ Create Sub-folder</option>
               </select>
             </div>
             {showNewFolder && (
               <div className="mt-2 flex space-x-2">
-                <input
-                  type="text"
-                  value={newFolderName}
-                  onChange={(e) => setNewFolderName(e.target.value)}
-                  placeholder="New folder name"
-                  className="input-field flex-1"
-                  onKeyPress={(e) => e.key === 'Enter' && handleAddFolder()}
-                />
+              <input
+                type="text"
+                value={newFolderName}
+                onChange={(e) => setNewFolderName(e.target.value)}
+                placeholder={folder ? `Sub-folder in "${folder}"` : "New folder name"}
+                className="input-field flex-1"
+                onKeyPress={(e) => e.key === 'Enter' && handleAddFolder()}
+              />
                 <button
                   onClick={handleAddFolder}
                   className="btn-secondary whitespace-nowrap"
