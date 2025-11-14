@@ -78,9 +78,12 @@ export default function UploadModal({ onClose, onSuccess, defaultFolder = null }
             console.error('Error parsing URL:', e, doc.s3_url) // Debug
             // Fallback: try simple split if URL parsing fails
             const parts = doc.s3_url.split('/').filter(p => p && !p.includes(':'))
-            // parts should be: [bucket, user_id, folder, filename] or [bucket, user_id, filename]
+            // parts should be: [bucket, user_id, ...folder_path..., filename]
             if (parts.length >= 4) {
-              return parts[2] // folder is at index 2
+              const folderPathParts = parts.slice(2, -1) // Skip bucket, user_id, and filename
+              if (folderPathParts.length > 0) {
+                return folderPathParts.join('/')
+              }
             }
           }
         }
