@@ -62,14 +62,17 @@ export default function UploadModal({ onClose, onSuccess, defaultFolder = null }
             const url = new URL(doc.s3_url)
             const pathParts = url.pathname.split('/').filter(p => p) // Remove empty strings
             console.log('Folder extraction - s3_url:', doc.s3_url, 'pathParts:', pathParts) // Debug
-            // Path structure: [bucket, user_id, folder, filename] when folder exists
-            // Path structure: [bucket, user_id, filename] when no folder
-            // If there are 4+ parts, folder is at index 2 (after bucket and user_id)
+            // Path structure: [bucket, user_id, ...folder_path..., filename]
+            // If there are 4+ parts, everything between user_id and filename is the folder path
             if (pathParts.length >= 4) {
-              // pathParts[0] = bucket, pathParts[1] = user_id, pathParts[2] = folder, pathParts[3] = filename
-              const folderName = pathParts[2]
-              console.log('Extracted folder:', folderName) // Debug
-              return folderName
+              // pathParts[0] = bucket, pathParts[1] = user_id, pathParts[2..-2] = folder path, pathParts[-1] = filename
+              const folderPathParts = pathParts.slice(2, -1) // Skip bucket, user_id, and filename
+              if (folderPathParts.length > 0) {
+                // Join folder path parts with '/' to get full nested path
+                const folderPath = folderPathParts.join('/')
+                console.log('Extracted folder path:', folderPath) // Debug
+                return folderPath
+              }
             }
           } catch (e) {
             console.error('Error parsing URL:', e, doc.s3_url) // Debug
