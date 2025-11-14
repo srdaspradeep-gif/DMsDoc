@@ -204,13 +204,26 @@ export default function FolderView() {
     const current = getCurrentFolder()
     if (!current) {
       // We're at root
+      const folders = Array.from(folderTree.children.values())
+      console.log('getCurrentContent (root):', {
+        folders: folders.length,
+        documents: documents.length,
+        folderNames: folders.map(f => f.name)
+      })
       return {
-        folders: Array.from(folderTree.children.values()),
+        folders: folders,
         documents: documents
       }
     }
+    const folders = Array.from(current.children.values())
+    console.log('getCurrentContent (folder):', {
+      path: currentPath.join('/'),
+      folders: folders.length,
+      documents: current.documents.length,
+      folderNames: folders.map(f => f.name)
+    })
     return {
-      folders: Array.from(current.children.values()),
+      folders: folders,
       documents: current.documents
     }
   }

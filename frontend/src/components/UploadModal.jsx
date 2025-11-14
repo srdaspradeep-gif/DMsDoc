@@ -426,7 +426,14 @@ export default function UploadModal({ onClose, onSuccess, defaultFolder = null }
               </div>
             )}
             {folder && !showNewFolder && (
-              <p className="text-xs text-gray-500 mt-1">Selected: <strong>{folder}</strong></p>
+              <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-xs text-blue-700">
+                  <strong>📁 Folder selected:</strong> <span className="font-mono">{folder}</span>
+                </p>
+                <p className="text-xs text-blue-600 mt-1">
+                  Document will be uploaded to this folder
+                </p>
+              </div>
             )}
           </div>
 
