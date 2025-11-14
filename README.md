@@ -34,10 +34,17 @@ cp app/.env.example app/.env
 # Start all services
 docker compose up --build
 
+# Wait for all services to be healthy, then create a test user
+python scripts/create_test_user.py
+
 # The application will be available at:
 # - Frontend: http://localhost:3000
 # - Backend API: http://localhost:8000
 # - API Docs: http://localhost:8000/docs
+
+# Default login credentials (after running create_test_user.py):
+# Email/Username: admin@docflow.com or admin
+# Password: admin123
 ```
 
 ### Option 2: Manual Setup
