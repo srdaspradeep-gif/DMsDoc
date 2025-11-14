@@ -15,9 +15,11 @@ export default function Correspondents() {
   const loadCorrespondents = async () => {
     try {
       // Get all documents and extract unique owners/correspondents
-      const response = await api.get('/v2/metadata?limit=1000&offset=0')
+      const response = await api.get('/v2/metadata?limit=100&offset=0')
       const data = response.data
-      const docs = data['documents of '] || []
+      // Find the key that starts with "documents of "
+      const docsKey = Object.keys(data).find(key => key.startsWith('documents of '))
+      const docs = docsKey ? data[docsKey] || [] : []
       
       // Group by owner_id to get correspondents
       const correspondentMap = new Map()

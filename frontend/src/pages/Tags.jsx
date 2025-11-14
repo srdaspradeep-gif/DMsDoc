@@ -18,9 +18,11 @@ export default function Tags() {
   const loadTags = async () => {
     try {
       // Get all documents to extract unique tags
-      const response = await api.get('/v2/metadata?limit=1000&offset=0')
+      const response = await api.get('/v2/metadata?limit=100&offset=0')
       const data = response.data
-      const docs = data['documents of '] || []
+      // Find the key that starts with "documents of "
+      const docsKey = Object.keys(data).find(key => key.startsWith('documents of '))
+      const docs = docsKey ? data[docsKey] || [] : []
       const allTags = [...new Set(docs.flatMap(doc => doc.tags || []))]
       setTags(allTags.map(tag => ({ name: tag, count: docs.filter(d => d.tags && d.tags.includes(tag)).length })))
     } catch (error) {

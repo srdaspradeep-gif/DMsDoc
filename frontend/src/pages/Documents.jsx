@@ -44,7 +44,9 @@ export default function Documents() {
     try {
       const response = await api.get(`/v2/metadata?limit=${itemsPerPage}&offset=${(currentPage - 1) * itemsPerPage}`)
       const data = response.data
-      const docs = data['documents of '] || []
+      // Find the key that starts with "documents of "
+      const docsKey = Object.keys(data).find(key => key.startsWith('documents of '))
+      const docs = docsKey ? data[docsKey] || [] : []
       
       // Sort documents
       const sorted = [...docs].sort((a, b) => {
