@@ -244,7 +244,7 @@ export default function FolderView() {
         folders.push(
           <div key={currentPath} className="select-none">
             <div
-              className={`flex items-center space-x-2 p-2 rounded-lg cursor-pointer ${
+              className={`group flex items-center space-x-2 p-2 rounded-lg cursor-pointer ${
                 isSelected
                   ? 'bg-blue-100 text-blue-700'
                   : 'hover:bg-gray-100 text-gray-700'
@@ -289,7 +289,7 @@ export default function FolderView() {
                     e.stopPropagation()
                     handleCreateSubFolder(currentPath)
                   }}
-                  className="p-1 hover:bg-blue-200 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                  className="p-1 hover:bg-blue-200 rounded opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
                   title="Create sub-folder"
                 >
                   <Plus size={12} className="text-blue-600" />
