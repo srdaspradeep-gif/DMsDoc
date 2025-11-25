@@ -25,6 +25,11 @@ from app.db.tables.dms.sections import Section  # noqa: F401
 from app.db.tables.dms.folders_new import FolderNew  # noqa: F401
 from app.db.tables.dms.files import FileNew  # noqa: F401
 from app.db.tables.dms.metadata import MetadataDefinition, FileMetadata, RelatedFile  # noqa: F401
+from app.db.tables.dms.versioning import FileVersion, FileLock, FileReminder  # noqa: F401
+from app.db.tables.dms.approvals import (  # noqa: F401
+    ApprovalWorkflow, ApprovalStep, FolderApprovalRule, FolderApprovalRuleApprover,
+    NotificationSettings, Notification
+)
 
 
 @asynccontextmanager

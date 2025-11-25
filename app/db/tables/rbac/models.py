@@ -37,6 +37,7 @@ account_users = Table(
     Column("account_id", String(26), ForeignKey("accounts.id", ondelete="CASCADE"), primary_key=True),
     Column("user_id", String(26), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True),
     Column("role_type", String(20), nullable=False, default="member"),  # owner, admin, member
+    Column("notification_preferences", Text, nullable=True),  # JSON string for notification settings
     Column("created_at", TIMESTAMP(timezone=True), server_default=text("now()")),
     Column("updated_at", TIMESTAMP(timezone=True), server_default=text("now()"), onupdate=text("now()")),
 )
@@ -124,6 +125,10 @@ class Account(Base):
     name = Column(String(200), nullable=False)
     slug = Column(String(100), unique=True, nullable=False, index=True)
     is_active = Column(Boolean, default=True, nullable=False)
+    
+    # Inbox address for email-import functionality
+    inbox_address = Column(String(200), unique=True, nullable=True, index=True)
+    
     created_at = Column(TIMESTAMP(timezone=True), nullable=False, server_default=text("now()"))
     updated_at = Column(TIMESTAMP(timezone=True), nullable=False, server_default=text("now()"), onupdate=text("now()"))
 

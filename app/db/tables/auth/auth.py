@@ -23,6 +23,12 @@ class User(Base):
     full_name = Column(String, nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
     is_super_admin = Column(Boolean, default=False, nullable=False)  # First user becomes super admin
+    
+    # Profile settings
+    language = Column(String(10), nullable=True, default="en")  # ISO 639-1 code
+    timezone = Column(String(50), nullable=True, default="UTC")  # IANA timezone
+    default_account_id = Column(String(26), ForeignKey("accounts.id", ondelete="SET NULL"), nullable=True)
+    
     user_since = Column(
         TIMESTAMP(timezone=True), nullable=False, server_default=text("now()")
     )
@@ -40,3 +46,4 @@ class User(Base):
     roles = relationship("Role", secondary="user_roles", back_populates="users")
     groups = relationship("Group", secondary="user_groups", back_populates="users")
     accounts = relationship("Account", secondary="account_users", back_populates="users")
+    default_account = relationship("Account", foreign_keys=[default_account_id])

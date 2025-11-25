@@ -28,6 +28,17 @@ from app.api.routes.dms.folders_dms import router as folders_dms_router
 from app.api.routes.dms.files_dms import router as files_dms_router
 from app.api.routes.dms.metadata import router as metadata_router
 from app.api.routes.dms.search import router as search_router
+from app.api.routes.dms.versioning import router as versioning_router
+from app.api.routes.dms.approvals import router as approvals_router
+from app.api.routes.dms.sharing import router as sharing_router
+from app.api.routes.dms.retention import router as retention_router
+from app.api.routes.dms.inbox import router as inbox_router
+from app.api.routes.dms.audit import router as audit_router
+from app.api.routes.dms.access_overview import router as access_overview_router
+from app.api.routes.dms.recycle_bin import router as recycle_bin_router
+
+# Profile routes
+from app.api.routes.rbac.profile import router as profile_router
 
 router = APIRouter()
 
@@ -58,3 +69,14 @@ router.include_router(folders_dms_router, prefix="/dms")
 router.include_router(files_dms_router, prefix="/dms")
 router.include_router(metadata_router, prefix="/dms")
 router.include_router(search_router, prefix="/dms")
+router.include_router(versioning_router, prefix="/dms")
+router.include_router(approvals_router, prefix="/dms")
+router.include_router(sharing_router, prefix="/dms")
+router.include_router(retention_router, prefix="/dms")
+router.include_router(inbox_router, prefix="/dms")
+router.include_router(audit_router, prefix="/dms")
+router.include_router(access_overview_router, prefix="/dms")
+router.include_router(recycle_bin_router, prefix="/dms")
+
+# Profile routes
+router.include_router(profile_router, prefix="/rbac")

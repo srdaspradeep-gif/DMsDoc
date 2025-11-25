@@ -31,6 +31,9 @@ class FileNew(Base):
     storage_path = Column(String(1000), nullable=False)  # S3/MinIO path
     file_hash = Column(String(64), nullable=True)  # SHA-256 hash for deduplication
     
+    # Versioning
+    current_version_id = Column(String(26), nullable=True)  # Points to current active version
+    
     # Tags and Notes
     tags = Column(ARRAY(String), nullable=True)  # Simple tags array
     notes = Column(Text, nullable=True)  # Free-form notes with support for links
