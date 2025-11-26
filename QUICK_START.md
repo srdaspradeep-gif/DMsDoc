@@ -13,12 +13,28 @@ cd DocMS
 cp app/.env.example app/.env
 
 # 3. Start everything
-docker compose up --build
+docker compose up -d --build
 
-# 4. Open in browser
+# 4. Wait for services to be healthy (about 30-60 seconds)
+docker compose ps
+
+# 5. Initialize database and create admin user
+python scripts/init_db.py
+
+# 6. Open in browser
 # Frontend: http://localhost:3000
 # API Docs: http://localhost:8000/docs
+
+# 7. Login with:
+#    Email: admin@docflow.com
+#    Password: admin123
 ```
+
+## 🔑 Default Login Credentials
+
+After running the setup, use these credentials:
+- **Email**: `admin@docflow.com`
+- **Password**: `admin123`
 
 ## 🎯 First Steps
 
