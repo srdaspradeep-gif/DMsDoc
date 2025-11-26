@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.api.dependencies.rbac import require_account_admin, get_current_user, get_rbac_service, RBACService
-from app.api.dependencies.repositories import get_repository, get_session
+from app.api.dependencies.repositories import get_repository, get_db
 from app.db.repositories.rbac.rbac_repository import RBACRepository
 from app.db.tables.auth.auth import User
 from app.schemas.rbac.schemas import UserWithRBAC
@@ -24,7 +24,7 @@ async def list_users(
     limit: int = 100,
     x_account_id: Optional[str] = Header(None),
     current_user: TokenData = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session)
+    session: AsyncSession = Depends(get_db)
 ):
     """List all users in an account"""
     stmt = select(User).offset(skip).limit(limit)
@@ -46,7 +46,7 @@ async def list_users(
 async def get_user(
     user_id: str,
     current_user: TokenData = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session)
+    session: AsyncSession = Depends(get_db)
 ):
     """Get user details including roles, groups, and accounts"""
     stmt = select(User).where(User.id == user_id).options(
@@ -100,7 +100,7 @@ async def get_user_accounts(
 )
 async def activate_user(
     user_id: str,
-    session: AsyncSession = Depends(get_session)
+    session: AsyncSession = Depends(get_db)
 ):
     """Activate a user account"""
     stmt = select(User).where(User.id == user_id)
@@ -123,7 +123,7 @@ async def activate_user(
 )
 async def deactivate_user(
     user_id: str,
-    session: AsyncSession = Depends(get_session)
+    session: AsyncSession = Depends(get_db)
 ):
     """Deactivate a user account"""
     stmt = select(User).where(User.id == user_id)

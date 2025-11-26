@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.api.dependencies.auth_utils import get_current_user, oauth2_scheme
-from app.api.dependencies.repositories import get_session
+from app.api.dependencies.repositories import get_db
 from app.core.exceptions import http_403
 from app.db.tables.auth.auth import User
 from app.db.tables.rbac.models import Role, Permission, Module, Account, APIKey
@@ -142,14 +142,14 @@ class RBACService:
         return False
 
 
-async def get_rbac_service(session: AsyncSession = Depends(get_session)) -> RBACService:
+async def get_rbac_service(session: AsyncSession = Depends(get_db)) -> RBACService:
     """Dependency to get RBAC service"""
     return RBACService(session)
 
 
 async def get_current_active_user(
     token_data: TokenData = Depends(get_current_user),
-    session: AsyncSession = Depends(get_session)
+    session: AsyncSession = Depends(get_db)
 ) -> User:
     """Get current active user from token"""
     stmt = select(User).where(User.id == token_data.id)
@@ -197,7 +197,7 @@ def require_super_admin():
     """Dependency to require super admin access"""
     async def super_admin_checker(
         current_user: TokenData = Depends(get_current_user),
-        session: AsyncSession = Depends(get_session)
+        session: AsyncSession = Depends(get_db)
     ):
         stmt = select(User).where(User.id == current_user.id)
         result = await session.execute(stmt)
@@ -244,7 +244,7 @@ def require_account_admin(account_id: Optional[str] = None):
 
 async def verify_api_key(
     x_api_key: Optional[str] = Header(None),
-    session: AsyncSession = Depends(get_session)
+    session: AsyncSession = Depends(get_db)
 ) -> Optional[APIKey]:
     """Verify API key from header"""
     if not x_api_key:
@@ -278,7 +278,7 @@ async def verify_api_key(
 async def get_current_user_or_api_key(
     token: Optional[str] = Depends(oauth2_scheme),
     api_key: Optional[APIKey] = Depends(verify_api_key),
-    session: AsyncSession = Depends(get_session)
+    session: AsyncSession = Depends(get_db)
 ):
     """Get current user from JWT token or API key"""
     if api_key:

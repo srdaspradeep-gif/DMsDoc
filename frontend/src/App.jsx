@@ -14,6 +14,10 @@ import DocumentTypes from './pages/DocumentTypes'
 import CustomFields from './pages/CustomFields'
 import Categories from './pages/Categories'
 import FolderView from './pages/FolderView'
+import MyAccess from './pages/MyAccess'
+import Users from './pages/admin/Users'
+import Roles from './pages/admin/Roles'
+import Groups from './pages/admin/Groups'
 import Layout from './components/Layout'
 
 function PrivateRoute({ children }) {
@@ -56,10 +60,13 @@ function App() {
             <Route path="categories" element={<Categories />} />
             <Route path="storage-paths" element={<FolderView />} />
             <Route path="custom-fields" element={<CustomFields />} />
+            <Route path="my-access" element={<MyAccess />} />
+            <Route path="admin/users" element={<Users />} />
+            <Route path="admin/roles" element={<Roles />} />
+            <Route path="admin/groups" element={<Groups />} />
             <Route path="templates" element={<div className="p-6"><h1 className="text-2xl font-semibold">Templates</h1><p className="text-gray-600 mt-2">Coming soon...</p></div>} />
             <Route path="mail" element={<div className="p-6"><h1 className="text-2xl font-semibold">Mail</h1><p className="text-gray-600 mt-2">Coming soon...</p></div>} />
             <Route path="settings" element={<div className="p-6"><h1 className="text-2xl font-semibold">Settings</h1><p className="text-gray-600 mt-2">Coming soon...</p></div>} />
-            <Route path="users" element={<div className="p-6"><h1 className="text-2xl font-semibold">Users & Groups</h1><p className="text-gray-600 mt-2">Coming soon...</p></div>} />
             <Route path="tasks" element={<div className="p-6"><h1 className="text-2xl font-semibold">File Tasks</h1><p className="text-gray-600 mt-2">Coming soon...</p></div>} />
             <Route path="logs" element={<div className="p-6"><h1 className="text-2xl font-semibold">Logs</h1><p className="text-gray-600 mt-2">Coming soon...</p></div>} />
           </Route>
