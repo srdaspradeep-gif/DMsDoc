@@ -9,6 +9,7 @@ export default function Sections() {
   const { user } = useAuth()
   const [sections, setSections] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [showModal, setShowModal] = useState(false)
   const [editingSection, setEditingSection] = useState(null)
@@ -22,13 +23,16 @@ export default function Sections() {
   }, [accountId])
 
   const loadSections = async () => {
+    setError(null)
     try {
       const response = await api.get('/v2/dms/sections', {
         headers: { 'X-Account-Id': accountId }
       })
       setSections(response.data)
-    } catch (error) {
-      toast.error('Failed to load sections')
+    } catch (err) {
+      const errorMsg = err.response?.data?.detail || 'Failed to load sections'
+      setError(errorMsg)
+      toast.error(errorMsg)
     } finally {
       setLoading(false)
     }
@@ -85,10 +89,40 @@ export default function Sections() {
     s.description?.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
+  if (!accountId) {
+    return (
+      <div className="p-4 md:p-6">
+        <div className="text-center py-12 bg-white rounded-lg border border-gray-200">
+          <FolderTree className="mx-auto text-gray-400 mb-4" size={48} />
+          <p className="text-gray-500">No account selected</p>
+          <p className="text-sm text-gray-400 mt-2">Please contact your administrator to assign you to an account.</p>
+        </div>
+      </div>
+    )
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="p-4 md:p-6">
+        <div className="text-center py-12 bg-white rounded-lg border border-red-200">
+          <FolderTree className="mx-auto text-red-400 mb-4" size={48} />
+          <p className="text-red-600 font-medium">Error loading sections</p>
+          <p className="text-sm text-gray-500 mt-2">{error}</p>
+          <button 
+            onClick={loadSections} 
+            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            Retry
+          </button>
+        </div>
       </div>
     )
   }
@@ -141,12 +175,18 @@ export default function Sections() {
               </div>
             </div>
             <div className="flex items-center justify-between text-sm text-gray-500">
-              <span>{section.folder_count || 0} folders</span>
+              <div className="flex gap-3">
+                <span className="flex items-center gap-1">
+                  <Folder size={14} />
+                  {section.folder_count || 0} folders
+                </span>
+                <span>{section.file_count || 0} files</span>
+              </div>
               <div className="flex gap-2">
-                <button onClick={() => handleEditSection(section)} className="text-gray-600 hover:text-gray-800">
+                <button onClick={() => handleEditSection(section)} className="text-gray-600 hover:text-gray-800" title="Edit">
                   <Edit2 size={16} />
                 </button>
-                <button onClick={() => handleDeleteSection(section.id)} className="text-red-600 hover:text-red-800">
+                <button onClick={() => handleDeleteSection(section.id)} className="text-red-600 hover:text-red-800" title="Delete">
                   <Trash2 size={16} />
                 </button>
               </div>

@@ -38,8 +38,8 @@ export default function Metadata() {
 
   const handleCreate = () => {
     setEditingDef({
-      name: '', key: '', field_type: 'text', description: '',
-      is_required: false, is_searchable: true, section_id: null, account_id: accountId
+      label: '', key: '', field_type: 'text', description: '',
+      is_required: false, options: null, section_id: null, account_id: accountId
     })
     setShowModal(true)
   }
@@ -85,7 +85,7 @@ export default function Metadata() {
   }
 
   const filteredDefs = definitions.filter(d =>
-    d.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    d.label?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     d.key?.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
@@ -140,7 +140,7 @@ export default function Metadata() {
                     <div className="flex items-center">
                       <List className="text-blue-600 mr-3" size={20} />
                       <div>
-                        <div className="text-sm font-medium text-gray-900">{def.name}</div>
+                        <div className="text-sm font-medium text-gray-900">{def.label}</div>
                         {def.is_required && <span className="text-xs text-red-600">Required</span>}
                       </div>
                     </div>
@@ -173,9 +173,9 @@ export default function Metadata() {
             <h2 className="text-xl font-semibold mb-4">{editingDef?.id ? 'Edit' : 'Create'} Metadata Field</h2>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
-                <input type="text" value={editingDef?.name || ''} onChange={(e) => setEditingDef({ ...editingDef, name: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none" />
+                <label className="block text-sm font-medium text-gray-700 mb-1">Label</label>
+                <input type="text" value={editingDef?.label || ''} onChange={(e) => setEditingDef({ ...editingDef, label: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none" placeholder="e.g. Department Name" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Key</label>
@@ -202,14 +202,22 @@ export default function Metadata() {
                 <textarea value={editingDef?.description || ''} onChange={(e) => setEditingDef({ ...editingDef, description: e.target.value })}
                   rows={2} className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none" />
               </div>
+              {(editingDef?.field_type === 'select' || editingDef?.field_type === 'multiselect') && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Options (one per line)</label>
+                  <textarea 
+                    value={(editingDef?.options || []).join('\n')} 
+                    onChange={(e) => setEditingDef({ ...editingDef, options: e.target.value.split('\n').filter(o => o.trim()) })}
+                    rows={3} 
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
+                    placeholder="Option 1&#10;Option 2&#10;Option 3" 
+                  />
+                </div>
+              )}
               <div className="flex gap-4">
                 <label className="flex items-center gap-2">
                   <input type="checkbox" checked={editingDef?.is_required || false} onChange={(e) => setEditingDef({ ...editingDef, is_required: e.target.checked })} className="w-4 h-4" />
                   <span className="text-sm">Required</span>
-                </label>
-                <label className="flex items-center gap-2">
-                  <input type="checkbox" checked={editingDef?.is_searchable !== false} onChange={(e) => setEditingDef({ ...editingDef, is_searchable: e.target.checked })} className="w-4 h-4" />
-                  <span className="text-sm">Searchable</span>
                 </label>
               </div>
             </div>

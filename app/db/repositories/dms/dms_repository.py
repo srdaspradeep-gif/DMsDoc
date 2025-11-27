@@ -53,13 +53,47 @@ class DMSRepository:
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
     
-    async def list_sections(self, account_id: str, skip: int = 0, limit: int = 100) -> List[Section]:
-        """List all sections for an account"""
+    async def list_sections(self, account_id: str, skip: int = 0, limit: int = 100) -> List[dict]:
+        """List all sections for an account with folder and file counts"""
         stmt = select(Section).where(
             Section.account_id == account_id
         ).order_by(Section.position, Section.name).offset(skip).limit(limit)
         result = await self.session.execute(stmt)
-        return result.scalars().all()
+        sections = result.scalars().all()
+        
+        # Add folder and file counts
+        sections_with_counts = []
+        for section in sections:
+            # Count folders
+            folder_stmt = select(func.count(FolderNew.id)).where(FolderNew.section_id == section.id)
+            folder_result = await self.session.execute(folder_stmt)
+            folder_count = folder_result.scalar() or 0
+            
+            # Count files (via folders)
+            file_stmt = select(func.count(FileNew.id)).join(
+                FolderNew, FileNew.folder_id == FolderNew.id
+            ).where(
+                FolderNew.section_id == section.id,
+                FileNew.is_deleted == False
+            )
+            file_result = await self.session.execute(file_stmt)
+            file_count = file_result.scalar() or 0
+            
+            section_dict = {
+                "id": section.id,
+                "account_id": section.account_id,
+                "name": section.name,
+                "description": section.description,
+                "position": section.position,
+                "created_by": section.created_by,
+                "created_at": section.created_at,
+                "updated_at": section.updated_at,
+                "folder_count": folder_count,
+                "file_count": file_count
+            }
+            sections_with_counts.append(section_dict)
+        
+        return sections_with_counts
     
     async def update_section(self, section_id: str, data: SectionUpdate, account_id: Optional[str] = None) -> Section:
         """Update section"""

@@ -25,10 +25,12 @@ class RBACService:
         Get all permissions for a user across their roles and groups.
         Returns a set of permission strings like "files:read", "admin_users:admin"
         """
+        from app.db.tables.rbac.models import Group
+        
         # Get user with roles and groups
         stmt = select(User).where(User.id == user_id).options(
             selectinload(User.roles).selectinload(Role.permissions).selectinload(Permission.module),
-            selectinload(User.groups).selectinload("roles").selectinload(Role.permissions).selectinload(Permission.module)
+            selectinload(User.groups).selectinload(Group.roles).selectinload(Role.permissions).selectinload(Permission.module)
         )
         result = await self.session.execute(stmt)
         user = result.scalar_one_or_none()

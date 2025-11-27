@@ -144,6 +144,8 @@ class SectionOut(SectionBase):
     created_by: str
     created_at: datetime
     updated_at: datetime
+    folder_count: int = 0
+    file_count: int = 0
 
     class Config:
         from_attributes = True

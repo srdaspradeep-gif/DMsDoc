@@ -29,8 +29,18 @@ class Token(BaseModel):
     token_type: str
 
 
+class AccountInfo(BaseModel):
+    id: str
+    name: str
+
+    class Config:
+        from_attributes = True
+
+
 class TokenData(BaseModel):
     id: Optional[str] = None
     username: Optional[str] = None
     email: Optional[str] = None
     is_active: Optional[bool] = None
+    default_account_id: Optional[str] = None
+    accounts: Optional[list[AccountInfo]] = None

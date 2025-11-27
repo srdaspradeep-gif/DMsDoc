@@ -5,15 +5,18 @@ import Layout from '../components/Layout';
 import FileVersions from '../components/FileVersions';
 import FileLock from '../components/FileLock';
 import FileReminders from '../components/FileReminders';
+import FileMetadata from '../components/FileMetadata';
+import { useAuth } from '../contexts/AuthContext';
 
 const FileDetailDMS = () => {
   const { fileId } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('details');
   const [error, setError] = useState(null);
-  const accountId = localStorage.getItem('accountId');
+  const accountId = user?.default_account_id || user?.accounts?.[0]?.id || localStorage.getItem('accountId');
 
   useEffect(() => {
     fetchFileDetails();
@@ -186,6 +189,15 @@ const FileDetailDMS = () => {
           </li>
           <li className="nav-item">
             <button
+              className={`nav-link ${activeTab === 'metadata' ? 'active' : ''}`}
+              onClick={() => setActiveTab('metadata')}
+            >
+              <i className="bi bi-tags me-2"></i>
+              Metadata
+            </button>
+          </li>
+          <li className="nav-item">
+            <button
               className={`nav-link ${activeTab === 'versions' ? 'active' : ''}`}
               onClick={() => setActiveTab('versions')}
             >
@@ -259,6 +271,10 @@ const FileDetailDMS = () => {
                 </div>
               </div>
             </div>
+          )}
+
+          {activeTab === 'metadata' && (
+            <FileMetadata fileId={fileId} accountId={accountId} />
           )}
 
           {activeTab === 'versions' && (
