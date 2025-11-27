@@ -4,6 +4,8 @@ module.exports = {
   moduleNameMapper: {
     '\\.(css|less|scss|sass)$': 'identity-obj-proxy',
     '\\.(jpg|jpeg|png|gif|svg)$': '<rootDir>/__mocks__/fileMock.js',
+    '^../services/api$': '<rootDir>/src/__mocks__/services/api.js',
+    '^../../services/api$': '<rootDir>/src/__mocks__/services/api.js',
   },
   transform: {
     '^.+\\.(js|jsx)$': 'babel-jest',

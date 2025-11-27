@@ -59,11 +59,15 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-NewStrongPassword_2025!}
       POSTGRES_DB: ${POSTGRES_DB:-docflow}
       HOST_URL: ${HOST_URL:-http://localhost:8000}
+      PYTHONPATH: /usr/src/app
     ports:
       - "${API_PORT:-8000}:8000"
     volumes:
-      - ./app:/app/app
-      - ./logs:/app/logs
+      - ./app:/usr/src/app/app
+      - ./logs:/usr/src/app/logs
+      - ./tests:/usr/src/app/tests
+      - ./pytest.ini:/usr/src/app/pytest.ini
+      - ./conftest.py:/usr/src/app/conftest.py
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     healthcheck:
       test: ["CMD", "curl", "-f", "http://127.0.0.1:8000/health"]

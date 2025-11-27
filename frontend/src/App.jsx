@@ -19,6 +19,17 @@ import Users from './pages/admin/Users'
 import Roles from './pages/admin/Roles'
 import Groups from './pages/admin/Groups'
 import Layout from './components/Layout'
+import AuditLog from './pages/AuditLog'
+import FileDetailDMS from './pages/FileDetailDMS'
+import Inbox from './pages/Inbox'
+import MyApprovals from './pages/MyApprovals'
+import MyReminders from './pages/MyReminders'
+import Profile from './pages/Profile'
+import RecycleBin from './pages/RecycleBin'
+import Sections from './pages/Sections'
+import Metadata from './pages/Metadata'
+import AccessOverview from './pages/AccessOverview'
+import Retention from './pages/Retention'
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth()
@@ -64,11 +75,22 @@ function App() {
             <Route path="admin/users" element={<Users />} />
             <Route path="admin/roles" element={<Roles />} />
             <Route path="admin/groups" element={<Groups />} />
+            <Route path="audit-log" element={<AuditLog />} />
+            <Route path="files/:fileId" element={<FileDetailDMS />} />
+            <Route path="inbox" element={<Inbox />} />
+            <Route path="approvals" element={<MyApprovals />} />
+            <Route path="reminders" element={<MyReminders />} />
+            <Route path="profile" element={<Profile />} />
+            <Route path="recycle-bin" element={<RecycleBin />} />
+            <Route path="sections" element={<Sections />} />
+            <Route path="metadata" element={<Metadata />} />
+            <Route path="access-overview" element={<AccessOverview />} />
+            <Route path="retention" element={<Retention />} />
             <Route path="templates" element={<div className="p-6"><h1 className="text-2xl font-semibold">Templates</h1><p className="text-gray-600 mt-2">Coming soon...</p></div>} />
             <Route path="mail" element={<div className="p-6"><h1 className="text-2xl font-semibold">Mail</h1><p className="text-gray-600 mt-2">Coming soon...</p></div>} />
             <Route path="settings" element={<div className="p-6"><h1 className="text-2xl font-semibold">Settings</h1><p className="text-gray-600 mt-2">Coming soon...</p></div>} />
             <Route path="tasks" element={<div className="p-6"><h1 className="text-2xl font-semibold">File Tasks</h1><p className="text-gray-600 mt-2">Coming soon...</p></div>} />
-            <Route path="logs" element={<div className="p-6"><h1 className="text-2xl font-semibold">Logs</h1><p className="text-gray-600 mt-2">Coming soon...</p></div>} />
+            <Route path="logs" element={<AuditLog />} />
           </Route>
           {/* Preview route outside Layout for fullscreen */}
           <Route

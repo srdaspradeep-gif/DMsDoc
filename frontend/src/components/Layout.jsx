@@ -60,12 +60,14 @@ export default function Layout() {
 
   const navItems = [
     { path: '/', icon: Home, label: 'Dashboard' },
+    { path: '/sections', icon: FolderTree, label: 'Sections' },
     { path: '/documents', icon: FileText, label: 'Documents' },
   ]
 
   const savedViews = [
-    { path: '/documents?view=inbox', icon: Inbox, label: 'Inbox' },
-    { path: '/documents?view=recent', icon: RefreshCw, label: 'Recently Added' },
+    { path: '/inbox', icon: Inbox, label: 'Inbox' },
+    { path: '/approvals', icon: FileCheck, label: 'Approvals' },
+    { path: '/reminders', icon: RefreshCw, label: 'Reminders' },
   ]
 
   const manageItems = [
@@ -80,10 +82,14 @@ export default function Layout() {
   ]
 
   const adminItems = [
+    { path: '/admin/users', icon: Users, label: 'Users' },
+    { path: '/admin/roles', icon: Settings, label: 'Roles' },
+    { path: '/admin/groups', icon: Users, label: 'Groups' },
+    { path: '/metadata', icon: List, label: 'Metadata' },
+    { path: '/retention', icon: RefreshCw, label: 'Retention' },
+    { path: '/access-overview', icon: HelpCircle, label: 'Access Overview' },
+    { path: '/audit-log', icon: Logs, label: 'Audit Log' },
     { path: '/settings', icon: Settings, label: 'Settings' },
-    { path: '/users', icon: Users, label: 'Users & Groups' },
-    { path: '/tasks', icon: FileCheck, label: 'File Tasks', badge: null },
-    { path: '/logs', icon: Logs, label: 'Logs' },
   ]
 
   const isActive = (path) => {
@@ -248,8 +254,21 @@ export default function Layout() {
             })}
           </div>
 
-          {/* Trash */}
-          <div className="px-2 mt-2">
+          {/* Recycle Bin & Trash */}
+          <div className="px-2 mt-2 space-y-1">
+            <Link
+              to="/recycle-bin"
+              onClick={() => isMobile && setMobileMenuOpen(false)}
+              className={`flex items-center space-x-3 px-3 py-2 rounded-lg transition-colors ${
+                isActive('/recycle-bin')
+                  ? 'bg-blue-600 text-white'
+                  : 'text-blue-100 hover:bg-blue-600/50'
+              }`}
+              title={sidebarCollapsed ? 'Recycle Bin' : ''}
+            >
+              <Trash2 size={20} />
+              {(!sidebarCollapsed || isMobile) && <span className="text-sm">Recycle Bin</span>}
+            </Link>
             <Link
               to="/trash"
               onClick={() => isMobile && setMobileMenuOpen(false)}

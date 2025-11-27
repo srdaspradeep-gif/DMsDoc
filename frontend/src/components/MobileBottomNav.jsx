@@ -1,14 +1,15 @@
-import { Home, FileText, CheckSquare, User } from 'lucide-react'
+import { Home, FileText, Inbox, CheckSquare, User } from 'lucide-react'
 import { Link, useLocation } from 'react-router-dom'
 
 export default function MobileBottomNav() {
   const location = useLocation()
 
   const navItems = [
-    { path: '/', icon: Home, label: 'Dashboard' },
+    { path: '/', icon: Home, label: 'Home' },
     { path: '/documents', icon: FileText, label: 'Files' },
-    { path: '/tasks', icon: CheckSquare, label: 'Tasks' },
-    { path: '/settings', icon: User, label: 'Profile' }
+    { path: '/inbox', icon: Inbox, label: 'Inbox' },
+    { path: '/approvals', icon: CheckSquare, label: 'Approvals' },
+    { path: '/profile', icon: User, label: 'Profile' }
   ]
 
   const isActive = (path) => {
