@@ -16,14 +16,25 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const token = localStorage.getItem('token')
-    if (token) {
-      // Verify token and get user info
-      api.defaults.headers.common['Authorization'] = `Bearer ${token}`
-      // You can add a verify endpoint call here
-      setUser({ token })
+    const initAuth = async () => {
+      const token = localStorage.getItem('token')
+      if (token) {
+        // Verify token and get user info
+        api.defaults.headers.common['Authorization'] = `Bearer ${token}`
+        try {
+          const userResponse = await api.get('/v2/u/me')
+          setUser({ ...userResponse.data, token })
+        } catch (error) {
+          // Token is invalid, clear it
+          console.error('Failed to fetch user:', error)
+          localStorage.removeItem('token')
+          delete api.defaults.headers.common['Authorization']
+          setUser(null)
+        }
+      }
+      setLoading(false)
     }
-    setLoading(false)
+    initAuth()
   }, [])
 
   const login = async (email, password) => {

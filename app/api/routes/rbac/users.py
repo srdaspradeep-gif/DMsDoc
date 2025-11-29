@@ -229,3 +229,35 @@ async def deactivate_user(
     user.is_active = False
     await session.commit()
     return {"message": "User deactivated successfully"}
+
+
+class ResetPasswordRequest(BaseModel):
+    """Schema for admin password reset"""
+    new_password: str = Field(..., min_length=5, max_length=50)
+
+
+@router.patch(
+    "/{user_id}/reset-password",
+    dependencies=[Depends(require_account_admin())],
+    summary="Reset user password (Admin only)"
+)
+async def reset_user_password(
+    user_id: str,
+    data: ResetPasswordRequest,
+    session: AsyncSession = Depends(get_db)
+):
+    """Reset a user's password (Admin only)"""
+    stmt = select(User).where(User.id == user_id)
+    result = await session.execute(stmt)
+    user = result.scalar_one_or_none()
+    
+    if not user:
+        from app.core.exceptions import http_404
+        raise http_404(msg="User not found")
+    
+    # Hash new password
+    user.password = get_hashed_password(data.new_password)
+    user.password_changed_at = datetime.utcnow()
+    
+    await session.commit()
+    return {"message": "Password reset successfully"}

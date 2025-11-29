@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext'
 import toast from 'react-hot-toast'
 
 export default function Metadata() {
-  const { user } = useAuth()
+  const { user, loading: authLoading } = useAuth()
   const [definitions, setDefinitions] = useState([])
   const [sections, setSections] = useState([])
   const [loading, setLoading] = useState(true)
@@ -16,10 +16,13 @@ export default function Metadata() {
   const accountId = user?.default_account_id || user?.accounts?.[0]?.id
 
   useEffect(() => {
+    if (authLoading) return // Wait for auth to complete
     if (accountId) {
       loadData()
+    } else {
+      setLoading(false) // No account, stop loading
     }
-  }, [accountId])
+  }, [accountId, authLoading])
 
   const loadData = async () => {
     try {
@@ -190,8 +193,16 @@ export default function Metadata() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Key</label>
-                <input type="text" value={editingDef?.key || ''} onChange={(e) => setEditingDef({ ...editingDef, key: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none" placeholder="e.g. department" />
+                <input type="text" value={editingDef?.key || ''} 
+                  onChange={(e) => {
+                    // Auto-convert to lowercase and replace spaces/invalid chars with underscores
+                    const sanitized = e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '_').replace(/_+/g, '_')
+                    setEditingDef({ ...editingDef, key: sanitized })
+                  }}
+                  className={`w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none ${
+                    editingDef?.key && !/^[a-z0-9_]+$/.test(editingDef.key) ? 'border-red-500' : 'border-gray-300'
+                  }`} placeholder="e.g. department" />
+                <p className="text-xs text-gray-500 mt-1">Only lowercase letters, numbers, and underscores allowed</p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>

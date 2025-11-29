@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api } from '../../services/api'
-import { Users as UsersIcon, Shield, UserCheck, UserX, Search, Plus, Edit2, Save, X } from 'lucide-react'
+import { Users as UsersIcon, Shield, UserCheck, UserX, Search, Plus, Edit2, Save, X, Key } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useAuth } from '../../contexts/AuthContext'
 
@@ -11,6 +11,9 @@ export default function Users() {
   const [searchQuery, setSearchQuery] = useState('')
   const [showModal, setShowModal] = useState(false)
   const [editingUser, setEditingUser] = useState(null)
+  const [showResetPassword, setShowResetPassword] = useState(false)
+  const [resetPasswordUser, setResetPasswordUser] = useState(null)
+  const [newPassword, setNewPassword] = useState('')
   
   const currentAccountId = user?.default_account_id || user?.accounts?.[0]?.id
 
@@ -86,6 +89,32 @@ export default function Users() {
       loadUsers()
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Failed to update user status')
+    }
+  }
+
+  const handleResetPassword = (user) => {
+    setResetPasswordUser(user)
+    setNewPassword('')
+    setShowResetPassword(true)
+  }
+
+  const submitResetPassword = async () => {
+    if (!newPassword || newPassword.length < 5) {
+      toast.error('Password must be at least 5 characters')
+      return
+    }
+    try {
+      const headers = currentAccountId ? { 'X-Account-Id': currentAccountId } : {}
+      await api.patch(`/v2/rbac/users/${resetPasswordUser.id}/reset-password`, 
+        { new_password: newPassword }, 
+        { headers }
+      )
+      toast.success('Password reset successfully')
+      setShowResetPassword(false)
+      setResetPasswordUser(null)
+      setNewPassword('')
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Failed to reset password')
     }
   }
 
@@ -245,7 +274,29 @@ export default function Users() {
               {editingUser?.id ? 'Edit User' : 'Create User'}
             </h2>
             <div className="space-y-4">
-              {!editingUser?.id && (
+              {editingUser?.id ? (
+                <>
+                  {/* Show read-only user info when editing */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Username</label>
+                    <input
+                      type="text"
+                      value={editingUser?.username || ''}
+                      disabled
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 bg-gray-50 text-gray-600"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                    <input
+                      type="email"
+                      value={editingUser?.email || ''}
+                      disabled
+                      className="w-full border border-gray-200 rounded-lg px-3 py-2 bg-gray-50 text-gray-600"
+                    />
+                  </div>
+                </>
+              ) : (
                 <>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -311,6 +362,19 @@ export default function Users() {
                   <span className="ml-2 text-xs text-purple-600">(Super Admin cannot be deactivated)</span>
                 )}
               </div>
+              {/* Reset Password button for existing users */}
+              {editingUser?.id && (
+                <button
+                  onClick={() => {
+                    setShowModal(false)
+                    handleResetPassword(editingUser)
+                  }}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-amber-100 text-amber-700 rounded-lg hover:bg-amber-200"
+                >
+                  <Key size={18} />
+                  Reset Password
+                </button>
+              )}
             </div>
             <div className="flex gap-2 mt-6">
               <button
@@ -324,6 +388,52 @@ export default function Users() {
                 onClick={() => {
                   setShowModal(false)
                   setEditingUser(null)
+                }}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+              >
+                <X size={18} />
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reset Password Modal */}
+      {showResetPassword && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h2 className="text-xl font-semibold mb-4">Reset Password</h2>
+            <p className="text-sm text-gray-600 mb-4">
+              Reset password for <span className="font-medium">{resetPasswordUser?.username}</span>
+            </p>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  New Password <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                  placeholder="Enter new password (min 5 chars)"
+                />
+              </div>
+            </div>
+            <div className="flex gap-2 mt-6">
+              <button
+                onClick={submitResetPassword}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700"
+              >
+                <Key size={18} />
+                Reset Password
+              </button>
+              <button
+                onClick={() => {
+                  setShowResetPassword(false)
+                  setResetPasswordUser(null)
+                  setNewPassword('')
                 }}
                 className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
               >
