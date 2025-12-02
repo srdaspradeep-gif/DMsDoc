@@ -18,7 +18,6 @@ import {
   Info, 
   Tag,
   ExternalLink,
-  Eye,
   ScanLine,
   Shield
 } from 'lucide-react';
