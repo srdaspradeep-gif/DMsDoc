@@ -9,9 +9,7 @@ export default function SecureViewer({ fileId, fileName, mimeType, accountId, on
   const [fileUrl, setFileUrl] = useState(null);
   const [zoom, setZoom] = useState(100);
   const [rotation, setRotation] = useState(0);
-  const [pdfPages, setPdfPages] = useState([]);
   const containerRef = useRef(null);
-  const canvasContainerRef = useRef(null);
 
   useEffect(() => {
     loadFile();
@@ -69,53 +67,11 @@ export default function SecureViewer({ fileId, fileName, mimeType, accountId, on
       const blob = new Blob([response.data], { type: mimeType });
       const url = URL.createObjectURL(blob);
       setFileUrl(url);
-
-      // For PDFs, we'll render to canvas to prevent right-click issues
-      if (mimeType === 'application/pdf') {
-        await renderPdfToCanvas(blob);
-      }
     } catch (err) {
       setError('Failed to load file for viewing');
       console.error(err);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const renderPdfToCanvas = async (blob) => {
-    try {
-      // Use PDF.js if available, otherwise fall back to object tag
-      const pdfjsLib = window.pdfjsLib;
-      if (!pdfjsLib) {
-        // PDF.js not loaded, will use fallback
-        return;
-      }
-
-      const arrayBuffer = await blob.arrayBuffer();
-      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-      const pages = [];
-
-      for (let i = 1; i <= pdf.numPages; i++) {
-        const page = await pdf.getPage(i);
-        const scale = 1.5;
-        const viewport = page.getViewport({ scale });
-
-        const canvas = document.createElement('canvas');
-        const context = canvas.getContext('2d');
-        canvas.height = viewport.height;
-        canvas.width = viewport.width;
-
-        await page.render({
-          canvasContext: context,
-          viewport: viewport
-        }).promise;
-
-        pages.push(canvas.toDataURL('image/png'));
-      }
-
-      setPdfPages(pages);
-    } catch (err) {
-      console.warn('PDF.js rendering failed, using fallback:', err);
     }
   };
 
@@ -127,25 +83,20 @@ export default function SecureViewer({ fileId, fileName, mimeType, accountId, on
   const isPdf = mimeType === 'application/pdf';
   const isSupported = isImage || isPdf;
 
-  // Prevent all default behaviors
-  const preventDefaults = (e) => {
+  // Prevent context menu only
+  const preventContextMenu = (e) => {
     e.preventDefault();
-    e.stopPropagation();
+    toast.error('Right-click is disabled');
     return false;
   };
 
   return (
     <div 
       className="fixed inset-0 bg-black bg-opacity-95 z-[9999] flex flex-col"
-      onContextMenu={preventDefaults}
-      onCopy={preventDefaults}
-      onCut={preventDefaults}
-      onPaste={preventDefaults}
-      onDragStart={preventDefaults}
-      onDrop={preventDefaults}
+      onContextMenu={preventContextMenu}
     >
       {/* Header */}
-      <div className="bg-gray-900 text-white px-4 py-3 flex items-center justify-between relative z-[10001]">
+      <div className="bg-gray-900 text-white px-4 py-3 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center space-x-4">
           <h3 className="font-medium truncate max-w-md">{fileName}</h3>
           <span className="text-xs bg-red-600 px-2 py-1 rounded font-bold">SECURE VIEW</span>
@@ -189,14 +140,14 @@ export default function SecureViewer({ fileId, fileName, mimeType, accountId, on
       </div>
 
       {/* Security Notice */}
-      <div className="bg-red-600 text-white text-xs px-4 py-2 text-center font-medium relative z-[10001]">
+      <div className="bg-red-600 text-white text-xs px-4 py-2 text-center font-medium flex-shrink-0">
         🔒 SECURE VIEW MODE: Download, Print, Copy, and Right-Click are DISABLED. This document is protected.
       </div>
 
-      {/* Content Area */}
+      {/* Content Area - Scrollable */}
       <div 
         ref={containerRef}
-        className="flex-1 overflow-auto flex items-center justify-center p-4 relative"
+        className="flex-1 overflow-auto relative"
         style={{ 
           userSelect: 'none',
           WebkitUserSelect: 'none',
@@ -206,113 +157,112 @@ export default function SecureViewer({ fileId, fileName, mimeType, accountId, on
         }}
       >
         {loading ? (
-          <div className="flex flex-col items-center space-y-4 z-[10000]">
+          <div className="flex flex-col items-center justify-center h-full space-y-4">
             <Loader2 className="animate-spin text-white" size={48} />
             <p className="text-white">Loading secure view...</p>
           </div>
         ) : error ? (
-          <div className="text-center z-[10000]">
-            <p className="text-red-400 mb-4">{error}</p>
-            <button onClick={onClose} className="btn-secondary">
-              Close
-            </button>
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center">
+              <p className="text-red-400 mb-4">{error}</p>
+              <button onClick={onClose} className="btn-secondary">
+                Close
+              </button>
+            </div>
           </div>
         ) : !isSupported ? (
-          <div className="text-center text-white z-[10000]">
-            <p className="mb-4">This file type cannot be previewed in secure view.</p>
-            <p className="text-gray-400 text-sm">Supported formats: Images (JPG, PNG, GIF) and PDF</p>
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center text-white">
+              <p className="mb-4">This file type cannot be previewed in secure view.</p>
+              <p className="text-gray-400 text-sm">Supported formats: Images (JPG, PNG, GIF) and PDF</p>
+            </div>
           </div>
         ) : (
-          <div 
-            ref={canvasContainerRef}
-            className="relative"
-            style={{
-              transform: `scale(${zoom / 100}) rotate(${rotation}deg)`,
-              transition: 'transform 0.2s ease',
-              transformOrigin: 'center center'
-            }}
-          >
-            {isPdf && pdfPages.length > 0 ? (
-              // Rendered PDF pages as images (most secure)
-              <div className="space-y-4">
-                {pdfPages.map((pageUrl, index) => (
-                  <img
-                    key={index}
-                    src={pageUrl}
-                    alt={`Page ${index + 1}`}
-                    className="max-w-full shadow-lg"
-                    draggable={false}
-                    onContextMenu={preventDefaults}
-                    onDragStart={preventDefaults}
-                    style={{ pointerEvents: 'none' }}
-                  />
-                ))}
-              </div>
-            ) : isPdf ? (
-              // Fallback: Use object tag with overlay to block interactions
-              <div className="relative">
-                <object
-                  data={`${fileUrl}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`}
+          <div className="min-h-full p-4 flex justify-center">
+            {/* Document Container with Watermark */}
+            <div 
+              className="relative inline-block"
+              style={{
+                transform: `scale(${zoom / 100}) rotate(${rotation}deg)`,
+                transformOrigin: 'top center',
+                transition: 'transform 0.2s ease'
+              }}
+            >
+              {isPdf ? (
+                <embed
+                  src={`${fileUrl}#toolbar=0&navpanes=0&scrollbar=1&view=FitH`}
                   type="application/pdf"
-                  className="bg-white"
+                  className="bg-white shadow-2xl"
                   style={{
-                    width: '800px',
-                    height: '600px',
-                    maxWidth: '90vw',
-                    maxHeight: '70vh'
+                    width: '850px',
+                    height: '1100px',
+                    maxWidth: '95vw'
                   }}
-                >
-                  <p className="text-white">PDF cannot be displayed</p>
-                </object>
-                {/* Transparent overlay to block PDF interactions */}
-                <div 
-                  className="absolute inset-0 z-[100]"
-                  onContextMenu={preventDefaults}
-                  onClick={preventDefaults}
-                  style={{ cursor: 'default' }}
                 />
-              </div>
-            ) : isImage ? (
-              <img
-                src={fileUrl}
-                alt={fileName}
-                className="max-w-full max-h-[70vh] object-contain shadow-lg"
-                draggable={false}
-                onContextMenu={preventDefaults}
-                onDragStart={preventDefaults}
-                style={{ pointerEvents: 'none' }}
-              />
-            ) : null}
-          </div>
-        )}
+              ) : isImage ? (
+                <img
+                  src={fileUrl}
+                  alt={fileName}
+                  className="max-w-full shadow-2xl"
+                  draggable={false}
+                  onContextMenu={preventContextMenu}
+                  onDragStart={(e) => e.preventDefault()}
+                />
+              ) : null}
 
-        {/* Watermark Overlay - ON TOP of content */}
-        {!loading && !error && isSupported && (
-          <div 
-            className="absolute inset-0 pointer-events-none z-[9999] overflow-hidden flex items-center justify-center"
-          >
-            {/* Multiple watermarks for better coverage */}
-            <div className="absolute inset-0 flex flex-wrap items-center justify-center gap-32" style={{ transform: 'rotate(-30deg)' }}>
-              {[...Array(9)].map((_, i) => (
+              {/* Watermark Overlay - Positioned over the document */}
+              <div 
+                className="absolute inset-0 pointer-events-none overflow-hidden"
+                style={{ zIndex: 10 }}
+              >
+                {/* Diagonal watermarks */}
                 <div 
-                  key={i}
-                  className="text-gray-500 font-bold whitespace-nowrap"
+                  className="absolute inset-0"
                   style={{
-                    fontSize: '48px',
-                    opacity: 0.15,
-                    textShadow: '2px 2px 4px rgba(0,0,0,0.3)'
+                    background: `repeating-linear-gradient(
+                      -45deg,
+                      transparent,
+                      transparent 100px,
+                      rgba(128, 128, 128, 0.03) 100px,
+                      rgba(128, 128, 128, 0.03) 200px
+                    )`
                   }}
+                />
+                
+                {/* Text watermarks */}
+                <div 
+                  className="absolute inset-0 flex items-center justify-center"
+                  style={{ transform: 'rotate(-35deg)' }}
                 >
-                  CONFIDENTIAL
+                  <div className="flex flex-col items-center space-y-24">
+                    {[0, 1, 2, 3, 4].map((row) => (
+                      <div key={row} className="flex space-x-16">
+                        {[0, 1, 2].map((col) => (
+                          <span
+                            key={col}
+                            className="text-gray-500 font-bold whitespace-nowrap select-none"
+                            style={{
+                              fontSize: '32px',
+                              opacity: 0.12,
+                              textShadow: '1px 1px 2px rgba(0,0,0,0.2)',
+                              letterSpacing: '4px'
+                            }}
+                          >
+                            CONFIDENTIAL
+                          </span>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              ))}
+              </div>
             </div>
           </div>
         )}
       </div>
 
       {/* Footer */}
-      <div className="bg-gray-900 text-gray-400 text-xs px-4 py-2 text-center relative z-[10001]">
+      <div className="bg-gray-900 text-gray-400 text-xs px-4 py-2 text-center flex-shrink-0">
         Document viewed in secure mode. All actions are logged for compliance. © DocFlow DMS
       </div>
     </div>
