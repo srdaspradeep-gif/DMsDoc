@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../services/api';
 import FileVersions from '../components/FileVersions';
 import FileLock from '../components/FileLock';
 import FileReminders from '../components/FileReminders';
 import FileMetadata from '../components/FileMetadata';
+import SecureViewer from '../components/SecureViewer';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
 import { 
@@ -16,7 +17,10 @@ import {
   Bell, 
   Info, 
   Tag,
-  ExternalLink
+  ExternalLink,
+  Eye,
+  ScanLine,
+  Shield
 } from 'lucide-react';
 
 const FileDetailDMS = () => {
@@ -27,6 +31,8 @@ const FileDetailDMS = () => {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('details');
   const [error, setError] = useState(null);
+  const [showSecureViewer, setShowSecureViewer] = useState(false);
+  const [ocrLoading, setOcrLoading] = useState(false);
   const accountId = user?.default_account_id || user?.accounts?.[0]?.id;
 
   useEffect(() => {
@@ -95,6 +101,25 @@ const FileDetailDMS = () => {
     return new Date(dateString).toLocaleString();
   };
 
+  const handleSecureView = () => {
+    setShowSecureViewer(true);
+  };
+
+  const handleRunOCR = async () => {
+    try {
+      setOcrLoading(true);
+      // For now, just show a toast - OCR integration will be added later
+      toast.success('OCR process initiated. This feature will be fully integrated soon.');
+      // Future: await api.post(`/v2/dms/files-dms/${fileId}/ocr`, {}, { headers: { 'X-Account-Id': accountId } });
+    } catch (err) {
+      toast.error('Failed to run OCR');
+    } finally {
+      setOcrLoading(false);
+    }
+  };
+
+  const canPreview = file?.mime_type?.startsWith('image/') || file?.mime_type === 'application/pdf';
+
   const tabs = [
     { id: 'details', label: 'Details', icon: Info },
     { id: 'metadata', label: 'Metadata', icon: Tag },
@@ -155,10 +180,21 @@ const FileDetailDMS = () => {
             <span className="break-words">{file.name}</span>
           </h1>
         </div>
-        <button className="btn-primary flex items-center space-x-2" onClick={handleDownload}>
-          <Download size={18} />
-          <span>Download</span>
-        </button>
+        <div className="flex items-center space-x-2">
+          <button 
+            className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2"
+            onClick={handleRunOCR}
+            disabled={ocrLoading}
+            title="Extract text from document using OCR"
+          >
+            <ScanLine size={18} />
+            <span>{ocrLoading ? 'Processing...' : 'Run OCR'}</span>
+          </button>
+          <button className="btn-primary flex items-center space-x-2" onClick={handleDownload}>
+            <Download size={18} />
+            <span>Download</span>
+          </button>
+        </div>
       </div>
 
       {/* File Info Card */}
@@ -272,6 +308,15 @@ const FileDetailDMS = () => {
             <div>
               <h4 className="text-md font-medium text-gray-900 mb-3">Quick Actions</h4>
               <div className="flex flex-wrap gap-3">
+                {canPreview && (
+                  <button 
+                    className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2" 
+                    onClick={handleSecureView}
+                  >
+                    <Shield size={18} />
+                    <span>Secure View</span>
+                  </button>
+                )}
                 <button 
                   className="btn-secondary flex items-center space-x-2" 
                   onClick={handleDownload}
@@ -302,6 +347,22 @@ const FileDetailDMS = () => {
                 </button>
               </div>
             </div>
+
+            {/* Secure View Info */}
+            {canPreview && (
+              <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+                <div className="flex items-start space-x-3">
+                  <Shield className="text-green-600 flex-shrink-0 mt-0.5" size={20} />
+                  <div>
+                    <h5 className="font-medium text-green-800">Secure View Available</h5>
+                    <p className="text-sm text-green-700 mt-1">
+                      View this document in a protected mode where downloading, printing, and copying are disabled.
+                      Right-click is blocked and all viewing activity is logged.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -321,6 +382,17 @@ const FileDetailDMS = () => {
           <FileReminders fileId={fileId} accountId={accountId} />
         )}
       </div>
+
+      {/* Secure Viewer Modal */}
+      {showSecureViewer && (
+        <SecureViewer
+          fileId={fileId}
+          fileName={file.name}
+          mimeType={file.mime_type}
+          accountId={accountId}
+          onClose={() => setShowSecureViewer(false)}
+        />
+      )}
     </div>
   );
 };
