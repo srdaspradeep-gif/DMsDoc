@@ -16,6 +16,7 @@ import Groups from './pages/admin/Groups'
 import Layout from './components/Layout'
 import AuditLog from './pages/AuditLog'
 import FileDetailDMS from './pages/FileDetailDMS'
+import FolderDetailDMS from './pages/FolderDetailDMS'
 import Inbox from './pages/Inbox'
 import MyApprovals from './pages/MyApprovals'
 import MyReminders from './pages/MyReminders'
@@ -67,6 +68,7 @@ function App() {
             <Route path="admin/groups" element={<Groups />} />
             <Route path="audit-log" element={<AuditLog />} />
             <Route path="files/:fileId" element={<FileDetailDMS />} />
+            <Route path="folders/:folderId" element={<FolderDetailDMS />} />
             <Route path="inbox" element={<Inbox />} />
             <Route path="approvals" element={<MyApprovals />} />
             <Route path="reminders" element={<MyReminders />} />

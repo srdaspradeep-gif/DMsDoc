@@ -6,6 +6,7 @@ import FileLock from '../components/FileLock';
 import FileReminders from '../components/FileReminders';
 import FileMetadata from '../components/FileMetadata';
 import SecureViewer from '../components/SecureViewer';
+import FileAccessControl from '../components/FileAccessControl';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
 import { 
@@ -22,7 +23,8 @@ import {
   Shield,
   KeyRound,
   ShieldCheck,
-  ShieldOff
+  ShieldOff,
+  Users
 } from 'lucide-react';
 
 const FileDetailDMS = () => {
@@ -157,6 +159,7 @@ const FileDetailDMS = () => {
     { id: 'details', label: 'Details', icon: Info },
     { id: 'metadata', label: 'Metadata', icon: Tag },
     { id: 'versions', label: 'Versions', icon: Clock },
+    { id: 'access', label: 'Access', icon: Users },
     { id: 'lock', label: 'Lock', icon: Lock },
     { id: 'reminders', label: 'Reminders', icon: Bell },
   ];
@@ -462,6 +465,10 @@ const FileDetailDMS = () => {
 
         {activeTab === 'versions' && (
           <FileVersions fileId={fileId} accountId={accountId} />
+        )}
+
+        {activeTab === 'access' && (
+          <FileAccessControl fileId={fileId} accountId={accountId} resourceType="file" />
         )}
 
         {activeTab === 'lock' && (
