@@ -27,6 +27,7 @@ import Sections from './pages/Sections'
 import Metadata from './pages/Metadata'
 import AccessOverview from './pages/AccessOverview'
 import Retention from './pages/Retention'
+import Settings from './pages/Settings'
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth()
@@ -80,7 +81,7 @@ function App() {
             <Route path="metadata" element={<Metadata />} />
             <Route path="access-overview" element={<AccessOverview />} />
             <Route path="retention" element={<Retention />} />
-            <Route path="settings" element={<div className="p-6"><h1 className="text-2xl font-semibold">Settings</h1><p className="text-gray-600 mt-2">Coming soon...</p></div>} />
+            <Route path="settings" element={<Settings />} />
             <Route path="logs" element={<AuditLog />} />
           </Route>
           {/* Preview route outside Layout for fullscreen */}

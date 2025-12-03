@@ -27,12 +27,13 @@ const AuditLog = () => {
   const loadLogs = async () => {
     setLoading(true);
     try {
-      const response = await axios.post('/dms/audit/query', filters, {
+      const response = await axios.post('/v2/dms/audit/query', filters, {
         params: { account_id: accountId }
       });
       setLogs(response.data);
     } catch (error) {
       console.error('Failed to load audit logs:', error);
+      alert('Failed to load audit logs: ' + (error.response?.data?.detail || error.message));
     } finally {
       setLoading(false);
     }

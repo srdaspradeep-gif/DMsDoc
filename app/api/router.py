@@ -37,6 +37,7 @@ from app.api.routes.dms.audit import router as audit_router
 from app.api.routes.dms.access_overview import router as access_overview_router
 from app.api.routes.dms.recycle_bin import router as recycle_bin_router
 from app.api.routes.dms.reminders import router as reminders_router
+from app.api.routes.dms.settings import router as settings_router
 
 # Profile routes
 from app.api.routes.rbac.profile import router as profile_router
@@ -79,6 +80,7 @@ router.include_router(audit_router, prefix="/dms")
 router.include_router(access_overview_router, prefix="/dms")
 router.include_router(recycle_bin_router, prefix="/dms")
 router.include_router(reminders_router, prefix="/dms")
+router.include_router(settings_router, prefix="/dms")
 
 # Profile routes
 router.include_router(profile_router, prefix="/rbac")
